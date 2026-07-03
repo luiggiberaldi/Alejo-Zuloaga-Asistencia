@@ -10,6 +10,7 @@ import { getDb } from '@/services/database/client';
 import { logger } from '@/services/logger';
 import { supabase } from '@/services/supabase/client';
 import { useAuthStore } from '@/store/auth-store';
+import { extractHttpStatus } from '@/services/sync/error-utils';
 
 import type { SyncResult } from '@/modules/sync/types';
 
@@ -116,17 +117,23 @@ export async function syncNow(): Promise<SyncResult> {
       } catch (error: any) {
         logger.error(`Error sincronizando evento ${event.id} en Supabase`, error);
 
-        // Si es error 401 (JWT Expirado / Sesión inválida), abortar todo y desloguear
-        if (error.status === 401) {
+        const httpStatus = extractHttpStatus(error);
+
+        if (httpStatus === 401) {
           useAuthStore.getState().signOut();
           throw new Error('Sesión expirada. Por favor, inicia sesión de nuevo.');
         }
 
-        // Si es error 403 (RLS denegado en Supabase), tratarlo como fallo individual
-        // sin interrumpir la cola (se incrementan los intentos y se avanza al siguiente)
-        await incrementAttempts(event.id, error.message || 'Error desconocido de Supabase');
-        errors.push(`${event.entity} (${event.entityId}): ${error.message || '403 Forbidden (RLS)'}`);
-        failed++;
+        if (httpStatus === 403) {
+          // Si es error 403 (RLS denegado en Supabase), tratarlo como fallo individual
+          // sin interrumpir la cola (se incrementan los intentos y se avanza al siguiente)
+          await incrementAttempts(event.id, error.message || 'Error de RLS en Supabase');
+          errors.push(`${event.entity} (${event.entityId}): ${error.message || '403 Forbidden (RLS)'}`);
+          failed++;
+        } else {
+          // Si es un error de red o del servidor, abortamos todo el proceso de sync
+          throw error;
+        }
       }
     }
   }
@@ -258,7 +265,15 @@ export async function syncNow(): Promise<SyncResult> {
     );
   } catch (pullError: any) {
     logger.error('Error durante el Pull de cambios desde Supabase', pullError);
-    if (pullError.status === 401) {
+    // Diagnóstico temporal para inspeccionar la estructura real de errores
+    try {
+      logger.warn('Detalle completo del error del Pull:', JSON.stringify(pullError));
+    } catch {
+      // Ignorar fallos de serialización de errores circulares
+    }
+
+    const httpStatus = extractHttpStatus(pullError);
+    if (httpStatus === 401) {
       useAuthStore.getState().signOut();
       throw new Error('Sesión expirada durante la descarga de datos.');
     }
