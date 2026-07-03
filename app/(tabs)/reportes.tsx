@@ -93,7 +93,97 @@ export default function ReportesScreen() {
 
   // Actualizar vista previa cuando cambian los filtros (asíncrono con bandera active)
   useEffect(() => {
-    // Stubbed temporalmente en este commit para mantener disciplina de tamaño de commit
+    let active = true;
+
+    async function fetchPreview() {
+      if (!selectedSection) {
+        if (active) {
+          setPreviewData({
+            totalPresente: 0,
+            totalAusente: 0,
+            porcentajeAsistencia: null,
+            hasData: false,
+            title: '',
+            subtitle: '',
+          });
+        }
+        return;
+      }
+
+      if (reportType === 'individual') {
+        if (!selectedStudent) {
+          if (active) {
+            setPreviewData({
+              totalPresente: 0,
+              totalAusente: 0,
+              porcentajeAsistencia: null,
+              hasData: false,
+              title: '',
+              subtitle: '',
+            });
+          }
+          return;
+        }
+
+        setLoadingPreview(true);
+        try {
+          const data = await getStudentReportData(selectedStudent.id, dateRange);
+          if (active) {
+            setPreviewData({
+              totalPresente: data.totalPresente,
+              totalAusente: data.totalAusente,
+              porcentajeAsistencia: data.porcentajeAsistencia,
+              hasData: true,
+              title: `${data.student.apellidos}, ${data.student.nombres}`,
+              subtitle: `Cédula: ${data.student.cedula} | Sección: ${selectedSection.yearLevel} Año "${selectedSection.name}"`,
+            });
+          }
+        } catch {
+          if (active) {
+            setPreviewData((prev) => ({ ...prev, hasData: false }));
+          }
+        } finally {
+          if (active) setLoadingPreview(false);
+        }
+      } else {
+        setLoadingPreview(true);
+        try {
+          const rows = await getSectionReportRows(selectedSection.id, dateRange);
+          let pres = 0;
+          let abs = 0;
+          rows.forEach((r) => {
+            pres += r.totalPresente;
+            abs += r.totalAusente;
+          });
+
+          const total = pres + abs;
+          const pct = total > 0 ? Math.round((pres / total) * 100) : null;
+
+          if (active) {
+            setPreviewData({
+              totalPresente: pres,
+              totalAusente: abs,
+              porcentajeAsistencia: pct,
+              hasData: true,
+              title: `Sección ${selectedSection.yearLevel} Año "${selectedSection.name}"`,
+              subtitle: `Total Estudiantes: ${rows.length}`,
+            });
+          }
+        } catch {
+          if (active) {
+            setPreviewData((prev) => ({ ...prev, hasData: false }));
+          }
+        } finally {
+          if (active) setLoadingPreview(false);
+        }
+      }
+    }
+
+    fetchPreview();
+
+    return () => {
+      active = false;
+    };
   }, [reportType, selectedSection, selectedStudent, dateRange]);
 
   // Manejador de exportación a PDF
