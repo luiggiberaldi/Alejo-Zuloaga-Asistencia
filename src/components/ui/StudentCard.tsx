@@ -1,64 +1,78 @@
-import { StyleSheet, View } from 'react-native';
+import { useState } from 'react';
+import { Pressable, StyleSheet, View } from 'react-native';
 
-import { Card, IconButton, Text } from 'react-native-paper';
+import { Card, Text } from 'react-native-paper';
 
+import { AttendanceToggle } from '@/components/ui/AttendanceToggle';
 import { colors } from '@/theme';
 
+import type { AttendanceStatus } from '@/modules/attendance/types';
 import type { Student } from '@/modules/students/types';
 
 interface StudentCardProps {
   student: Student;
-  onDelete: () => void;
+  attendanceStatus: AttendanceStatus | undefined;
+  onAttendanceChange: (status: AttendanceStatus) => void;
+  onLongPress: () => void;
 }
 
-// Fase 2: solo botón de eliminar visible. El long press (reportar
-// comportamiento / eliminar) se agrega en la Fase 3.
-export function StudentCard({ student, onDelete }: StudentCardProps) {
+export function StudentCard({
+  student,
+  attendanceStatus,
+  onAttendanceChange,
+  onLongPress,
+}: StudentCardProps) {
+  const [isPressed, setIsPressed] = useState(false);
+
   return (
-    <Card style={styles.card} mode="elevated">
-      <Card.Content style={styles.content}>
-        <View style={styles.info}>
-          <Text variant="titleMedium">
-            {student.nombres} {student.apellidos}
-          </Text>
-          <Text variant="bodyMedium" style={styles.meta}>
-            Cédula: {student.cedula}
-          </Text>
-        </View>
-        <IconButton
-          icon="delete"
-          iconColor={colors.danger}
-          size={24}
-          style={styles.deleteButton}
-          onPress={onDelete}
-          accessibilityLabel="Eliminar estudiante"
-        />
-      </Card.Content>
-    </Card>
+    <Pressable
+      onPressIn={() => setIsPressed(true)}
+      onPressOut={() => setIsPressed(false)}
+      onLongPress={onLongPress}
+      delayLongPress={500}
+      style={({ pressed }) => [
+        styles.pressable,
+        {
+          opacity: pressed || isPressed ? 0.85 : 1,
+          transform: [{ scale: pressed || isPressed ? 0.98 : 1 }],
+        },
+      ]}
+    >
+      <Card style={styles.card} mode="elevated">
+        <Card.Content>
+          <View style={styles.info}>
+            <Text variant="titleMedium" style={styles.name}>
+              {student.nombres} {student.apellidos}
+            </Text>
+            <Text variant="bodyMedium" style={styles.meta}>
+              Cédula: {student.cedula}
+            </Text>
+          </View>
+
+          <AttendanceToggle status={attendanceStatus} onStatusChange={onAttendanceChange} />
+        </Card.Content>
+      </Card>
+    </Pressable>
   );
 }
 
 const styles = StyleSheet.create({
-  card: {
+  pressable: {
     marginHorizontal: 16,
     marginVertical: 6,
+  },
+  card: {
     backgroundColor: '#FFFFFF',
   },
-  content: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
   info: {
-    flex: 1,
+    marginBottom: 8,
   },
-  meta: {
-    marginTop: 4,
+  name: {
     color: colors.text,
   },
-  deleteButton: {
-    minWidth: 48,
-    minHeight: 48,
-    margin: 0,
+  meta: {
+    marginTop: 2,
+    color: colors.text,
+    opacity: 0.7,
   },
 });
