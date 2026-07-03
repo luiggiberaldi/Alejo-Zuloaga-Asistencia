@@ -5,14 +5,21 @@ import { Redirect, Stack, useLocalSearchParams } from 'expo-router';
 import { ActivityIndicator, IconButton, Snackbar, Text } from 'react-native-paper';
 
 import { AddStudentModal } from '@/components/ui/AddStudentModal';
+import { BehaviorReportModal } from '@/components/ui/BehaviorReportModal';
+import { DateSelector, getTodayString } from '@/components/ui/DateSelector';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { ImportXLSButton } from '@/components/ui/ImportXLSButton';
 import { StudentCard } from '@/components/ui/StudentCard';
+import { StudentContextMenu } from '@/components/ui/StudentContextMenu';
 import { getSectionById } from '@/modules/sections/repository';
+import { useAttendanceStore } from '@/store/attendance-store';
 import { useAuthStore } from '@/store/auth-store';
+import { useBehaviorStore } from '@/store/behavior-store';
 import { useStudentsStore } from '@/store/students-store';
 import { colors } from '@/theme';
 
+import type { AttendanceStatus } from '@/modules/attendance/types';
+import type { BehaviorSeverity } from '@/modules/behavior/types';
 import type { Section } from '@/modules/sections/types';
 import type { Student } from '@/modules/students/types';
 
@@ -21,16 +28,32 @@ export default function SectionDetailScreen() {
   const user = useAuthStore((state) => state.user);
 
   const students = useStudentsStore((state) => state.students);
-  const loading = useStudentsStore((state) => state.loading);
-  const error = useStudentsStore((state) => state.error);
+  const loadingStudents = useStudentsStore((state) => state.loading);
+  const studentError = useStudentsStore((state) => state.error);
   const loadStudents = useStudentsStore((state) => state.loadStudents);
   const addStudent = useStudentsStore((state) => state.addStudent);
   const removeStudent = useStudentsStore((state) => state.removeStudent);
-  const clearError = useStudentsStore((state) => state.clearError);
+  const clearStudentError = useStudentsStore((state) => state.clearError);
+
+  const attendanceByDate = useAttendanceStore((state) => state.attendanceByDate);
+  const loadingAttendance = useAttendanceStore((state) => state.loading);
+  const attendanceError = useAttendanceStore((state) => state.error);
+  const loadAttendance = useAttendanceStore((state) => state.loadAttendanceForSection);
+  const markAttendance = useAttendanceStore((state) => state.markAttendance);
+  const clearAttendanceError = useAttendanceStore((state) => state.clearError);
+
+  const addBehaviorReport = useBehaviorStore((state) => state.addReport);
+  const behaviorError = useBehaviorStore((state) => state.error);
+  const clearBehaviorError = useBehaviorStore((state) => state.clearError);
 
   const [section, setSection] = useState<Section | null>(null);
   const [sectionLoading, setSectionLoading] = useState(true);
   const [addModalVisible, setAddModalVisible] = useState(false);
+
+  const [selectedDate, setSelectedDate] = useState<string>(getTodayString());
+  const [activeStudent, setActiveStudent] = useState<Student | null>(null);
+  const [contextMenuVisible, setContextMenuVisible] = useState(false);
+  const [behaviorModalVisible, setBehaviorModalVisible] = useState(false);
 
   useEffect(() => {
     if (!id) return;
@@ -42,6 +65,11 @@ export default function SectionDetailScreen() {
     loadStudents(id);
   }, [id, loadStudents]);
 
+  useEffect(() => {
+    if (!id) return;
+    loadAttendance(id, selectedDate);
+  }, [id, selectedDate, loadAttendance]);
+
   const handleAddStudent = useCallback(
     async (cedula: string, nombres: string, apellidos: string) => {
       if (!id) return;
@@ -50,19 +78,66 @@ export default function SectionDetailScreen() {
     [addStudent, id],
   );
 
-  function handleDeleteStudent(student: Student) {
-    Alert.alert(
-      'Eliminar estudiante',
-      `¿Seguro que deseas eliminar a ${student.nombres} ${student.apellidos}? Esta acción no se puede deshacer.`,
-      [
-        { text: 'Cancelar', style: 'cancel' },
-        { text: 'Eliminar', style: 'destructive', onPress: () => removeStudent(student.id) },
-      ],
-    );
-  }
+  const handleAttendanceChange = useCallback(
+    async (studentId: string, status: AttendanceStatus) => {
+      try {
+        await markAttendance(studentId, selectedDate, status);
+      } catch {
+        // Rollback y alert ya son manejados por el store
+      }
+    },
+    [markAttendance, selectedDate],
+  );
+
+  const handleReportBehavior = useCallback(
+    async (description: string, severity: BehaviorSeverity) => {
+      if (!activeStudent) return;
+      try {
+        await addBehaviorReport(activeStudent.id, description, severity, selectedDate);
+        Alert.alert('Éxito', 'Reporte de comportamiento guardado correctamente.');
+      } catch {
+        // Rollback y alert ya son manejados por el store
+      }
+    },
+    [activeStudent, addBehaviorReport, selectedDate],
+  );
+
+  const handleDeleteStudent = useCallback(
+    (student: Student) => {
+      Alert.alert(
+        'Eliminar estudiante',
+        `¿Seguro que deseas eliminar a ${student.nombres} ${student.apellidos}? Esta acción no se puede deshacer.`,
+        [
+          { text: 'Cancelar', style: 'cancel' },
+          {
+            text: 'Eliminar',
+            style: 'destructive',
+            onPress: async () => {
+              try {
+                await removeStudent(student.id);
+              } catch {
+                Alert.alert('Error', 'No se pudo eliminar al estudiante de la base de datos local.');
+              }
+            },
+          },
+        ],
+      );
+    },
+    [removeStudent],
+  );
 
   if (!user) return <Redirect href="/(auth)/login" />;
   if (!id) return null;
+
+  const isPastDate = selectedDate !== getTodayString();
+  const isLoading = loadingStudents || loadingAttendance;
+  const activeError = studentError || attendanceError || behaviorError;
+
+  const handleClearError = () => {
+    if (studentError) clearStudentError();
+    if (attendanceError) clearAttendanceError();
+    if (behaviorError) clearBehaviorError();
+  };
 
   return (
     <View style={styles.container}>
@@ -92,23 +167,45 @@ export default function SectionDetailScreen() {
         <ActivityIndicator style={styles.loadingIndicator} size="large" color={colors.primary} />
       ) : (
         <>
-          {section && (
-            <Text variant="bodyMedium" style={styles.yearLevel}>
-              {section.yearLevel} año
-            </Text>
+          <View style={styles.sectionHeader}>
+            {section && (
+              <Text variant="titleMedium" style={styles.yearLevel}>
+                {section.yearLevel} año
+              </Text>
+            )}
+            <DateSelector selectedDate={selectedDate} onDateChange={setSelectedDate} />
+          </View>
+
+          {isPastDate && (
+            <View style={styles.pastDateBanner}>
+              <Text style={styles.pastDateText}>
+                ⚠️ Editando asistencia de fecha pasada
+              </Text>
+            </View>
           )}
 
           <FlatList
             data={students}
             keyExtractor={(item) => item.id}
             renderItem={({ item }) => (
-              <StudentCard student={item} onDelete={() => handleDeleteStudent(item)} />
+              <StudentCard
+                student={item}
+                attendanceStatus={attendanceByDate[item.id]}
+                onAttendanceChange={(status) => handleAttendanceChange(item.id, status)}
+                onLongPress={() => {
+                  setActiveStudent(item);
+                  setContextMenuVisible(true);
+                }}
+              />
             )}
             contentContainerStyle={students.length === 0 ? styles.emptyContent : styles.listContent}
             refreshControl={
               <RefreshControl
-                refreshing={loading}
-                onRefresh={() => loadStudents(id)}
+                refreshing={isLoading}
+                onRefresh={() => {
+                  loadStudents(id);
+                  loadAttendance(id, selectedDate);
+                }}
                 colors={[colors.primary]}
               />
             }
@@ -129,8 +226,26 @@ export default function SectionDetailScreen() {
         onSubmit={handleAddStudent}
       />
 
-      <Snackbar visible={!!error} onDismiss={clearError} duration={4000}>
-        {error}
+      {activeStudent && (
+        <StudentContextMenu
+          visible={contextMenuVisible}
+          onDismiss={() => setContextMenuVisible(false)}
+          studentName={`${activeStudent.nombres} ${activeStudent.apellidos}`}
+          onReportBehavior={() => setBehaviorModalVisible(true)}
+          onDeleteStudent={() => handleDeleteStudent(activeStudent)}
+        />
+      )}
+
+      {activeStudent && (
+        <BehaviorReportModal
+          visible={behaviorModalVisible}
+          onDismiss={() => setBehaviorModalVisible(false)}
+          onSubmit={handleReportBehavior}
+        />
+      )}
+
+      <Snackbar visible={!!activeError} onDismiss={handleClearError} duration={4000}>
+        {activeError ?? ''}
       </Snackbar>
     </View>
   );
@@ -152,10 +267,27 @@ const styles = StyleSheet.create({
   loadingIndicator: {
     marginTop: 32,
   },
+  sectionHeader: {
+    paddingTop: 12,
+  },
   yearLevel: {
     paddingHorizontal: 16,
-    paddingTop: 12,
     color: colors.text,
+    opacity: 0.7,
+  },
+  pastDateBanner: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    backgroundColor: '#FFF3E0',
+    marginHorizontal: 16,
+    borderRadius: 8,
+    marginBottom: 8,
+    alignItems: 'center',
+  },
+  pastDateText: {
+    color: '#EF6C00',
+    fontWeight: 'bold',
+    fontSize: 14,
   },
   listContent: {
     paddingBottom: 24,
