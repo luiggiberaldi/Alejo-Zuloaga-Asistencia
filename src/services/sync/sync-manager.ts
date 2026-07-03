@@ -106,7 +106,136 @@ export async function syncNow(): Promise<SyncResult> {
   // 4. Proceso de PULL desde el servidor
   // El orden de pull (sections → students → attendance_records → behavior_reports)
   // es OBLIGATORIO por integridad referencial (Foreign Keys en la base de datos local SQLite).
-  // (Stubbed temporalmente en este commit para mantener disciplina de tamaño)
+  try {
+    const db = await getDb();
+
+    // Obtener último cursor de pull de sync_meta
+    const metaRow = await db.getFirstAsync<{ value: string }>(
+      "SELECT value FROM sync_meta WHERE key = 'last_pull_cursor'",
+    );
+    // Si no existe, inicializar con epoch ISO string (Trae todo el historial del profesor)
+    const lastPullCursor = metaRow ? metaRow.value : '1970-01-01T00:00:00.000Z';
+
+    // 4.1 PULL Sections
+    const { data: remoteSections, error: secError } = await supabase
+      .from('sections')
+      .select('*')
+      .gt('updated_at', lastPullCursor);
+
+    if (secError) throw secError;
+
+    if (remoteSections && remoteSections.length > 0) {
+      await db.withTransactionAsync(async () => {
+        for (const sec of remoteSections) {
+          await db.runAsync(
+            `INSERT OR REPLACE INTO sections (id, name, year_level, teacher_id, synced, created_at, updated_at)
+             VALUES (?, ?, ?, ?, 1, ?, ?)`,
+            sec.id,
+            sec.name,
+            sec.year_level,
+            sec.teacher_id,
+            Date.parse(sec.created_at),
+            Date.parse(sec.updated_at),
+          );
+          pulled++;
+        }
+      });
+    }
+
+    // 4.2 PULL Students
+    const { data: remoteStudents, error: studError } = await supabase
+      .from('students')
+      .select('*')
+      .gt('updated_at', lastPullCursor);
+
+    if (studError) throw studError;
+
+    if (remoteStudents && remoteStudents.length > 0) {
+      await db.withTransactionAsync(async () => {
+        for (const stud of remoteStudents) {
+          await db.runAsync(
+            `INSERT OR REPLACE INTO students (id, section_id, cedula, nombres, apellidos, synced, created_at, updated_at)
+             VALUES (?, ?, ?, ?, ?, 1, ?, ?)`,
+            stud.id,
+            stud.section_id,
+            stud.cedula,
+            stud.nombres,
+            stud.apellidos,
+            Date.parse(stud.created_at),
+            Date.parse(stud.updated_at),
+          );
+          pulled++;
+        }
+      });
+    }
+
+    // 4.3 PULL Attendance Records
+    const { data: remoteAttendance, error: attError } = await supabase
+      .from('attendance_records')
+      .select('*')
+      .gt('updated_at', lastPullCursor);
+
+    if (attError) throw attError;
+
+    if (remoteAttendance && remoteAttendance.length > 0) {
+      await db.withTransactionAsync(async () => {
+        for (const att of remoteAttendance) {
+          await db.runAsync(
+            `INSERT OR REPLACE INTO attendance_records (id, student_id, date, status, synced, created_at, updated_at)
+             VALUES (?, ?, ?, ?, 1, ?, ?)`,
+            att.id,
+            att.student_id,
+            att.date,
+            att.status,
+            Date.parse(att.created_at),
+            Date.parse(att.updated_at),
+          );
+          pulled++;
+        }
+      });
+    }
+
+    // 4.4 PULL Behavior Reports
+    const { data: remoteBehavior, error: behError } = await supabase
+      .from('behavior_reports')
+      .select('*')
+      .gt('updated_at', lastPullCursor);
+
+    if (behError) throw behError;
+
+    if (remoteBehavior && remoteBehavior.length > 0) {
+      await db.withTransactionAsync(async () => {
+        for (const beh of remoteBehavior) {
+          await db.runAsync(
+            `INSERT OR REPLACE INTO behavior_reports (id, student_id, description, severity, date, synced, created_at, updated_at)
+             VALUES (?, ?, ?, ?, ?, 1, ?, ?)`,
+            beh.id,
+            beh.student_id,
+            beh.description,
+            beh.severity,
+            beh.date,
+            Date.parse(beh.created_at),
+            Date.parse(beh.updated_at),
+          );
+          pulled++;
+        }
+      });
+    }
+
+    // Actualizar el cursor en sync_meta con el timestamp actual del dispositivo local
+    const newCursor = new Date().toISOString();
+    await db.runAsync(
+      "INSERT OR REPLACE INTO sync_meta (key, value) VALUES ('last_pull_cursor', ?)",
+      newCursor,
+    );
+  } catch (pullError: any) {
+    logger.error('Error durante el Pull de cambios desde Supabase', pullError);
+    if (pullError.status === 401) {
+      useAuthStore.getState().signOut();
+      throw new Error('Sesión expirada durante la descarga de datos.');
+    }
+    errors.push(`Descarga (Pull) fallida: ${pullError.message || 'Error desconocido'}`);
+  }
 
   return { pushed, failed, pulled, errors };
 }
