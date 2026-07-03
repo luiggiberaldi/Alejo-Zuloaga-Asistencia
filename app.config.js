@@ -26,8 +26,7 @@ export default {
     ],
     extra: {
       eas: {
-        // TODO: Pegar aquí el projectId real generado tras ejecutar `eas build:configure`
-        projectId: '',
+        projectId: 'bbcfea76-2235-4773-aae7-cafc6ff58f81',
       },
       supabaseUrl: process.env.EXPO_PUBLIC_SUPABASE_URL,
       supabaseAnonKey: process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY,
