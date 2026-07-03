@@ -1,6 +1,4 @@
-import type { Role } from '@/types/supabase_types';
-
-export type { Role };
+export type Role = 'profesor' | 'coordinador';
 
 export interface AuthUser {
   id: string;

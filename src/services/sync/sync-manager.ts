@@ -68,13 +68,13 @@ export async function syncNow(): Promise<SyncResult> {
       try {
         if (event.op === 'upsert') {
           const remoteData = preparePayloadForRemote(event.payload);
-          const { error } = await supabase.from(table).upsert(remoteData, { onConflict: 'id' });
+          const { error } = await supabase.from(table as any).upsert(remoteData, { onConflict: 'id' });
 
           if (error) {
             throw error;
           }
         } else if (event.op === 'delete') {
-          const { error } = await supabase.from(table).delete().eq('id', event.entityId);
+          const { error } = await supabase.from(table as any).delete().eq('id', event.entityId);
 
           if (error) {
             throw error;

@@ -54,5 +54,5 @@ export async function fetchUserRole(userId: string): Promise<Role | null> {
     return null;
   }
 
-  return data?.role ?? null;
+  return (data?.role as Role) ?? null;
 }
