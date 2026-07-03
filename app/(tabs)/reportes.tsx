@@ -188,7 +188,46 @@ export default function ReportesScreen() {
 
   // Manejador de exportación a PDF
   async function handleExportPDF() {
-    // Stubbed temporalmente en este commit para mantener disciplina de tamaño de commit
+    if (!selectedSection) return;
+
+    if (reportType === 'individual' && !selectedStudent) {
+      Alert.alert('Atención', 'Por favor, selecciona un estudiante.');
+      return;
+    }
+
+    if (dateRange.startDate > dateRange.endDate) {
+      Alert.alert('Rango Inválido', 'La fecha "Desde" no puede ser mayor que la fecha "Hasta".');
+      return;
+    }
+
+    setLoadingExport(true);
+    try {
+      if (reportType === 'individual' && selectedStudent) {
+        const data = await getStudentReportData(selectedStudent.id, dateRange);
+        const secFullName = `${selectedSection.yearLevel} Año "${selectedSection.name}"`;
+        const html = generateStudentReportHTML(data, secFullName, dateRange);
+
+        const fileName = `asistencia_${data.student.apellidos}_${data.student.nombres}_${dateRange.startDate}_a_${dateRange.endDate}`;
+        await generateAndSharePDF(html, fileName);
+      } else {
+        const rows = await getSectionReportRows(selectedSection.id, dateRange);
+        if (rows.length === 0) {
+          Alert.alert('Sección Vacía', 'No hay estudiantes registrados en esta sección para generar reporte.');
+          setLoadingExport(false);
+          return;
+        }
+
+        const secFullName = `${selectedSection.yearLevel} Año "${selectedSection.name}"`;
+        const html = generateSectionReportHTML(rows, secFullName, dateRange);
+
+        const fileName = `asistencia_seccion_${selectedSection.yearLevel}_${selectedSection.name}_${dateRange.startDate}_a_${dateRange.endDate}`;
+        await generateAndSharePDF(html, fileName);
+      }
+    } catch {
+      // Error ya se maneja y reporta internamente en generateAndSharePDF
+    } finally {
+      setLoadingExport(false);
+    }
   }
 
   if (loadingSections) {
