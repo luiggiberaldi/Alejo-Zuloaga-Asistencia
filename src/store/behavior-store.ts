@@ -8,6 +8,7 @@ import {
   getBehaviorReportsByStudent,
 } from '@/modules/behavior/repository';
 import { logger } from '@/services/logger';
+import { useSyncStore } from '@/store/sync-store';
 
 import type { BehaviorReport, BehaviorSeverity } from '@/modules/behavior/types';
 
@@ -68,6 +69,7 @@ export const useBehaviorStore = create<BehaviorState>((set, get) => ({
       set((state) => ({
         reports: state.reports.map((r) => (r.id === tempId ? realReport : r)),
       }));
+      useSyncStore.getState().refreshPendingCount();
     } catch (error) {
       logger.error('Fallo registrando reporte, ejecutando rollback', error);
       set(() => ({ reports: previousReports }));
@@ -90,6 +92,7 @@ export const useBehaviorStore = create<BehaviorState>((set, get) => ({
 
     try {
       await deleteBehaviorReport(id);
+      useSyncStore.getState().refreshPendingCount();
     } catch (error) {
       logger.error('Fallo eliminando reporte, ejecutando rollback', error);
       set(() => ({ reports: previousReports }));

@@ -4,6 +4,7 @@ import { create } from 'zustand';
 
 import { getAttendanceByDate, setAttendance } from '@/modules/attendance/repository';
 import { logger } from '@/services/logger';
+import { useSyncStore } from '@/store/sync-store';
 
 import type { AttendanceStatus } from '@/modules/attendance/types';
 
@@ -47,6 +48,7 @@ export const useAttendanceStore = create<AttendanceState>((set, get) => ({
 
     try {
       await setAttendance(studentId, date, status);
+      useSyncStore.getState().refreshPendingCount();
     } catch (error) {
       logger.error('Fallo al guardar asistencia, ejecutando rollback', error);
       // Rollback

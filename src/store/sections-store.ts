@@ -3,6 +3,7 @@ import { create } from 'zustand';
 import { createSection, deleteSection, getSections } from '@/modules/sections/repository';
 import { logger } from '@/services/logger';
 import { useAuthStore } from '@/store/auth-store';
+import { useSyncStore } from '@/store/sync-store';
 
 import type { Section, YearLevel } from '@/modules/sections/types';
 
@@ -43,6 +44,7 @@ export const useSectionsStore = create<SectionsState>((set) => ({
     try {
       const section = await createSection({ name, yearLevel, teacherId });
       set((state) => ({ sections: [section, ...state.sections] }));
+      useSyncStore.getState().refreshPendingCount();
     } catch (error) {
       logger.error('Error creando sección', error);
       set({ error: 'No se pudo crear la sección.' });
@@ -55,6 +57,7 @@ export const useSectionsStore = create<SectionsState>((set) => ({
     try {
       await deleteSection(id);
       set((state) => ({ sections: state.sections.filter((section) => section.id !== id) }));
+      useSyncStore.getState().refreshPendingCount();
     } catch (error) {
       logger.error('Error eliminando sección', error);
       set({ error: 'No se pudo eliminar la sección.' });

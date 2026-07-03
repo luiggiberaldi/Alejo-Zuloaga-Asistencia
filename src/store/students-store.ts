@@ -7,6 +7,7 @@ import {
   getStudentsBySection,
 } from '@/modules/students/repository';
 import { logger } from '@/services/logger';
+import { useSyncStore } from '@/store/sync-store';
 
 import type { CreateStudentInput, Student } from '@/modules/students/types';
 
@@ -48,6 +49,7 @@ export const useStudentsStore = create<StudentsState>((set) => ({
     try {
       const student = await createStudent(input);
       set((state) => ({ students: sortStudents([...state.students, student]) }));
+      useSyncStore.getState().refreshPendingCount();
     } catch (error) {
       logger.error('Error registrando estudiante', error);
       set({ error: 'No se pudo registrar el estudiante.' });
@@ -60,6 +62,7 @@ export const useStudentsStore = create<StudentsState>((set) => ({
     try {
       const students = await createStudentsBatch(inputs);
       set((state) => ({ students: sortStudents([...state.students, ...students]) }));
+      useSyncStore.getState().refreshPendingCount();
     } catch (error) {
       logger.error('Error importando estudiantes', error);
       set({ error: 'No se pudieron importar los estudiantes.' });
@@ -72,6 +75,7 @@ export const useStudentsStore = create<StudentsState>((set) => ({
     try {
       await deleteStudent(id);
       set((state) => ({ students: state.students.filter((student) => student.id !== id) }));
+      useSyncStore.getState().refreshPendingCount();
     } catch (error) {
       logger.error('Error eliminando estudiante', error);
       set({ error: 'No se pudo eliminar el estudiante.' });
