@@ -236,6 +236,143 @@ export function generateSectionReportHTML(
   sectionName: string,
   dateRange: DateRange,
 ): string {
-  // Stubbed temporalmente en este commit para mantener disciplina de tamaño de commit
-  return '';
+  const escSectionName = escapeHtml(sectionName);
+  const generatedAt = formatDateSpanish(new Date().toISOString().split('T')[0]);
+  const rangeStartLabel = formatDateSpanish(dateRange.startDate);
+  const rangeEndLabel = formatDateSpanish(dateRange.endDate);
+
+  // Calcular promedios globales de la sección
+  let totalPresentesSeccion = 0;
+  let totalAusentesSeccion = 0;
+
+  rows.forEach((r) => {
+    totalPresentesSeccion += r.totalPresente;
+    totalAusentesSeccion += r.totalAusente;
+  });
+
+  const totalGlobal = totalPresentesSeccion + totalAusentesSeccion;
+  const promAsistenciaVal =
+    totalGlobal > 0 ? Math.round((totalPresentesSeccion / totalGlobal) * 100) : null;
+  const promAsistenciaLabel = promAsistenciaVal !== null ? `${promAsistenciaVal}%` : 'Sin datos';
+
+  let tableRowsHTML = '';
+  if (rows.length === 0) {
+    tableRowsHTML = `
+      <tr>
+        <td colspan="5" style="padding: 12px; text-align: center; color: #666; font-style: italic;">
+          Sección sin estudiantes registrados
+        </td>
+      </tr>`;
+  } else {
+    tableRowsHTML = rows
+      .map((r, index) => {
+        const escNombres = escapeHtml(r.student.nombres);
+        const escApellidos = escapeHtml(r.student.apellidos);
+        const escCedula = escapeHtml(r.student.cedula);
+        const pct = r.porcentajeAsistencia !== null ? `${r.porcentajeAsistencia}%` : 'Sin datos';
+
+        return `
+        <tr style="page-break-inside: avoid;">
+          <td style="padding: 8px 10px; border-bottom: 1px solid #E0E0E0; text-align: center;">
+            ${index + 1}
+          </td>
+          <td style="padding: 8px 10px; border-bottom: 1px solid #E0E0E0;">
+            ${escApellidos}, ${escNombres}
+          </td>
+          <td style="padding: 8px 10px; border-bottom: 1px solid #E0E0E0; text-align: center;">
+            ${escCedula}
+          </td>
+          <td style="padding: 8px 10px; border-bottom: 1px solid #E0E0E0; text-align: center;">
+            ${r.totalPresente}
+          </td>
+          <td style="padding: 8px 10px; border-bottom: 1px solid #E0E0E0; text-align: center;">
+            ${r.totalAusente}
+          </td>
+          <td style="padding: 8px 10px; border-bottom: 1px solid #E0E0E0; text-align: center; font-weight: bold; color: #1B5E20;">
+            ${pct}
+          </td>
+        </tr>`;
+      })
+      .join('');
+  }
+
+  return `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="utf-8">
+      <style>
+        body { font-family: system-ui, -apple-system, sans-serif; color: #212121; line-height: 1.5; padding: 30px; margin: 0; }
+        .header { text-align: center; margin-bottom: 25px; border-bottom: 3px solid #1B5E20; padding-bottom: 15px; }
+        .header h1 { color: #1B5E20; margin: 0; font-size: 22px; font-weight: bold; }
+        .header p { margin: 5px 0 0 0; color: #555; font-size: 14px; }
+        .info-card { background-color: #F5F5F5; padding: 12px 15px; border-radius: 8px; margin-bottom: 25px; border-left: 5px solid #1B5E20; }
+        .info-card table { width: 100%; }
+        .info-card td { padding: 4px 8px; font-size: 14px; }
+        .info-card td.label { font-weight: bold; color: #555; width: 120px; }
+        table.data-table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
+        table.data-table th { background-color: #1B5E20; color: white; padding: 10px; font-size: 12px; font-weight: bold; text-align: center; text-transform: uppercase; }
+        table.data-table th.left { text-align: left; }
+        table.data-table td { font-size: 13px; }
+        .totals-row { background-color: #E8F5E9; font-weight: bold; }
+        .totals-row td { padding: 10px; border-top: 2px solid #1B5E20; border-bottom: 2px solid #1B5E20; text-align: center; font-size: 14px; }
+        .footer { text-align: center; font-size: 11px; color: #888; margin-top: 50px; border-top: 1px solid #E0E0E0; padding-top: 15px; }
+      </style>
+    </head>
+    <body>
+      <div class="header">
+        <h1>Complejo Educativo Alejo Zuloaga</h1>
+        <p>Alejo Zuloaga Asistencia — Reporte de Sección</p>
+      </div>
+
+      <div class="info-card">
+        <table>
+          <tr>
+            <td class="label">Sección:</td>
+            <td><b>${escSectionName}</b></td>
+          </tr>
+          <tr>
+            <td class="label">Rango de análisis:</td>
+            <td>Desde el ${rangeStartLabel} hasta el ${rangeEndLabel}</td>
+          </tr>
+        </table>
+      </div>
+
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th style="width: 40px;">N°</th>
+            <th class="left">Estudiante</th>
+            <th style="width: 100px;">Cédula</th>
+            <th style="width: 80px;">Asistencias</th>
+            <th style="width: 80px;">Inasistencias</th>
+            <th style="width: 90px;">% Asistencia</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${tableRowsHTML}
+          
+          ${
+            rows.length > 0
+              ? `
+          <tr class="totals-row" style="page-break-inside: avoid;">
+            <td></td>
+            <td style="text-align: left; padding: 10px;">RESUMEN DE SECCIÓN</td>
+            <td></td>
+            <td>${totalPresentesSeccion}</td>
+            <td>${totalAusentesSeccion}</td>
+            <td style="color: #1B5E20; font-size: 14px;">${promAsistenciaLabel}</td>
+          </tr>
+          `
+              : ''
+          }
+        </tbody>
+      </table>
+
+      <div class="footer">
+        Reporte consolidado de sección generado por Alejo Zuloaga Asistencia el ${generatedAt}.<br/>
+        Rango de análisis: ${rangeStartLabel} - ${rangeEndLabel}.
+      </div>
+    </body>
+    </html>`;
 }
