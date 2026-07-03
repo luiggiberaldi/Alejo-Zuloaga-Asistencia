@@ -13,13 +13,7 @@ import { useAuthStore } from '@/store/auth-store';
 
 import type { SyncResult } from '@/modules/sync/types';
 
-// Mapeo de entidades a tablas de Supabase
-const TABLE_MAP: Record<string, string> = {
-  section: 'sections',
-  student: 'students',
-  attendance: 'attendance_records',
-  behavior: 'behavior_reports',
-};
+
 
 // Conversión de timestamps numéricos locales a ISO Strings para Supabase TIMESTAMPTZ
 function preparePayloadForRemote(payloadStr: string): any {
@@ -59,26 +53,60 @@ export async function syncNow(): Promise<SyncResult> {
     // Procesamiento estrictamente SECUENCIAL (for...of + await) dentro del chunk
     // para evitar saturar conexiones móviles limitadas en el liceo.
     for (const event of chunk) {
-      const table = TABLE_MAP[event.entity];
-      if (!table) {
-        logger.warn(`Entidad desconocida omitida en outbox: ${event.entity}`);
-        continue;
-      }
-
       try {
-        if (event.op === 'upsert') {
-          const remoteData = preparePayloadForRemote(event.payload);
-          const { error } = await supabase.from(table as any).upsert(remoteData, { onConflict: 'id' });
+        const remoteData = preparePayloadForRemote(event.payload);
+        let error: any = null;
+        let isUnknown = false;
 
-          if (error) {
-            throw error;
-          }
-        } else if (event.op === 'delete') {
-          const { error } = await supabase.from(table as any).delete().eq('id', event.entityId);
+        switch (event.entity) {
+          case 'section':
+            if (event.op === 'upsert') {
+              const res = await supabase.from('sections').upsert(remoteData, { onConflict: 'id' });
+              error = res.error;
+            } else if (event.op === 'delete') {
+              const res = await supabase.from('sections').delete().eq('id', event.entityId);
+              error = res.error;
+            }
+            break;
+          case 'student':
+            if (event.op === 'upsert') {
+              const res = await supabase.from('students').upsert(remoteData, { onConflict: 'id' });
+              error = res.error;
+            } else if (event.op === 'delete') {
+              const res = await supabase.from('students').delete().eq('id', event.entityId);
+              error = res.error;
+            }
+            break;
+          case 'attendance':
+            if (event.op === 'upsert') {
+              const res = await supabase.from('attendance_records').upsert(remoteData, { onConflict: 'id' });
+              error = res.error;
+            } else if (event.op === 'delete') {
+              const res = await supabase.from('attendance_records').delete().eq('id', event.entityId);
+              error = res.error;
+            }
+            break;
+          case 'behavior':
+            if (event.op === 'upsert') {
+              const res = await supabase.from('behavior_reports').upsert(remoteData, { onConflict: 'id' });
+              error = res.error;
+            } else if (event.op === 'delete') {
+              const res = await supabase.from('behavior_reports').delete().eq('id', event.entityId);
+              error = res.error;
+            }
+            break;
+          default:
+            isUnknown = true;
+            break;
+        }
 
-          if (error) {
-            throw error;
-          }
+        if (isUnknown) {
+          logger.warn(`Entidad desconocida omitida en outbox: ${event.entity}`);
+          continue;
+        }
+
+        if (error) {
+          throw error;
         }
 
         // Éxito: remover de la cola outbox y marcar estado synced localmente
