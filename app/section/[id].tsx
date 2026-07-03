@@ -11,6 +11,7 @@ import { EmptyState } from '@/components/ui/EmptyState';
 import { ImportXLSButton } from '@/components/ui/ImportXLSButton';
 import { StudentCard } from '@/components/ui/StudentCard';
 import { StudentContextMenu } from '@/components/ui/StudentContextMenu';
+import { SyncButton } from '@/components/ui/SyncButton';
 import { getSectionById } from '@/modules/sections/repository';
 import { useAttendanceStore } from '@/store/attendance-store';
 import { useAuthStore } from '@/store/auth-store';
@@ -158,6 +159,7 @@ export default function SectionDetailScreen() {
                 accessibilityLabel="Añadir estudiante"
               />
               <ImportXLSButton sectionId={id} />
+              <SyncButton />
             </View>
           ),
         }}

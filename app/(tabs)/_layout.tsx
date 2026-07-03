@@ -1,5 +1,6 @@
 import { Redirect, Tabs } from 'expo-router';
 
+import { SyncButton } from '@/components/ui/SyncButton';
 import { useAuthStore } from '@/store/auth-store';
 import { colors } from '@/theme';
 
@@ -16,6 +17,7 @@ export default function TabsLayout() {
         headerStyle: { backgroundColor: colors.primary },
         headerTintColor: '#FFFFFF',
         tabBarActiveTintColor: colors.primary,
+        headerRight: () => <SyncButton />,
       }}
     >
       <Tabs.Screen name="index" options={{ title: 'Inicio' }} />
