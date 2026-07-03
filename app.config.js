@@ -14,6 +14,7 @@ export default {
     },
     plugins: [
       'expo-router',
+      'expo-sharing',
       [
         'expo-splash-screen',
         {
