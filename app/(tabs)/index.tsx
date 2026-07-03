@@ -1,33 +1,76 @@
-import { StyleSheet, View } from 'react-native';
+import { useCallback, useEffect, useState } from 'react';
+import { FlatList, RefreshControl, StyleSheet, View } from 'react-native';
 
-import { Button, Text } from 'react-native-paper';
+import { router } from 'expo-router';
+import { FAB, Snackbar, Text } from 'react-native-paper';
 
-import { signOutUser } from '@/modules/auth/repository';
-import { useAuthStore } from '@/store/auth-store';
+import { AddSectionModal } from '@/components/ui/AddSectionModal';
+import { EmptyState } from '@/components/ui/EmptyState';
+import { SectionCard } from '@/components/ui/SectionCard';
+import { useSectionsStore } from '@/store/sections-store';
 import { colors } from '@/theme';
 
-export default function InicioScreen() {
-  const user = useAuthStore((state) => state.user);
-  const role = useAuthStore((state) => state.role);
-  const signOut = useAuthStore((state) => state.signOut);
+import type { Section, YearLevel } from '@/modules/sections/types';
 
-  async function handleSignOut() {
-    await signOutUser();
-    signOut();
+export default function InicioScreen() {
+  const sections = useSectionsStore((state) => state.sections);
+  const loading = useSectionsStore((state) => state.loading);
+  const error = useSectionsStore((state) => state.error);
+  const loadSections = useSectionsStore((state) => state.loadSections);
+  const addSection = useSectionsStore((state) => state.addSection);
+  const clearError = useSectionsStore((state) => state.clearError);
+
+  const [modalVisible, setModalVisible] = useState(false);
+
+  useEffect(() => {
+    loadSections();
+  }, [loadSections]);
+
+  const handleCreateSection = useCallback(
+    async (name: string, yearLevel: YearLevel) => {
+      await addSection(name, yearLevel);
+    },
+    [addSection],
+  );
+
+  function renderItem({ item }: { item: Section }) {
+    return <SectionCard section={item} onPress={() => router.push(`/section/${item.id}`)} />;
   }
 
   return (
     <View style={styles.container}>
-      <Text variant="titleLarge">Bienvenido/a</Text>
-      <Text variant="bodyMedium" style={styles.info}>
-        {user?.email ?? 'Sin correo'} · {role ?? 'Sin rol asignado'}
+      <Text variant="headlineSmall" style={styles.header}>
+        Mis Secciones
       </Text>
-      <Text variant="bodySmall" style={styles.info}>
-        Las secciones y la asistencia se implementan en la Fase 2.
-      </Text>
-      <Button mode="outlined" onPress={handleSignOut} style={styles.button}>
-        Cerrar sesión
-      </Button>
+
+      <FlatList
+        data={sections}
+        keyExtractor={(item) => item.id}
+        renderItem={renderItem}
+        contentContainerStyle={sections.length === 0 ? styles.emptyContent : styles.listContent}
+        refreshControl={
+          <RefreshControl refreshing={loading} onRefresh={loadSections} colors={[colors.primary]} />
+        }
+        ListEmptyComponent={
+          <EmptyState
+            icon="school-outline"
+            title="No hay secciones"
+            subtitle="Crea la primera con el botón +"
+          />
+        }
+      />
+
+      <FAB icon="plus" style={styles.fab} color="#FFFFFF" onPress={() => setModalVisible(true)} />
+
+      <AddSectionModal
+        visible={modalVisible}
+        onDismiss={() => setModalVisible(false)}
+        onSubmit={handleCreateSection}
+      />
+
+      <Snackbar visible={!!error} onDismiss={clearError} duration={4000}>
+        {error}
+      </Snackbar>
     </View>
   );
 }
@@ -35,14 +78,22 @@ export default function InicioScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    padding: 24,
     backgroundColor: colors.background,
   },
-  info: {
-    marginTop: 8,
+  header: {
+    padding: 16,
     color: colors.text,
   },
-  button: {
-    marginTop: 24,
+  listContent: {
+    paddingBottom: 96,
+  },
+  emptyContent: {
+    flexGrow: 1,
+  },
+  fab: {
+    position: 'absolute',
+    right: 16,
+    bottom: 16,
+    backgroundColor: colors.primary,
   },
 });
