@@ -5,6 +5,7 @@ import { Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { SQLiteProvider } from 'expo-sqlite';
 import { StatusBar } from 'expo-status-bar';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { PaperProvider } from 'react-native-paper';
 
 import { fetchUserRole, getCurrentSession } from '@/modules/auth/repository';
@@ -64,18 +65,20 @@ function DatabaseLoading() {
 
 export default function RootLayout() {
   return (
-    <Suspense fallback={<DatabaseLoading />}>
-      <SQLiteProvider databaseName="alejo_zuloaga.db" onInit={initSchema} useSuspense>
-        <PaperProvider theme={paperTheme}>
-          <AuthBootstrap>
-            <StatusBar style="light" />
-            <Stack screenOptions={{ headerShown: false }}>
-              <Stack.Screen name="(auth)" />
-              <Stack.Screen name="(tabs)" />
-            </Stack>
-          </AuthBootstrap>
-        </PaperProvider>
-      </SQLiteProvider>
-    </Suspense>
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <Suspense fallback={<DatabaseLoading />}>
+        <SQLiteProvider databaseName="alejo_zuloaga.db" onInit={initSchema} useSuspense>
+          <PaperProvider theme={paperTheme}>
+            <AuthBootstrap>
+              <StatusBar style="light" />
+              <Stack screenOptions={{ headerShown: false }}>
+                <Stack.Screen name="(auth)" />
+                <Stack.Screen name="(tabs)" />
+              </Stack>
+            </AuthBootstrap>
+          </PaperProvider>
+        </SQLiteProvider>
+      </Suspense>
+    </GestureHandlerRootView>
   );
 }
