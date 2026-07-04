@@ -1,3 +1,5 @@
+import * as Crypto from 'expo-crypto';
+
 import { getDb } from '@/services/database/client';
 import { logger } from '@/services/logger';
 
@@ -35,7 +37,7 @@ export async function createBehaviorReport(
 ): Promise<BehaviorReport> {
   const db = await getDb();
   const now = Date.now();
-  const id = crypto.randomUUID();
+  const id = Crypto.randomUUID();
 
   const row: BehaviorReportRow = {
     id,
@@ -65,10 +67,10 @@ export async function createBehaviorReport(
       await db.runAsync(
         `INSERT INTO outbox (id, entity, entity_id, op, payload, idempotency_key, created_at, attempts)
          VALUES (?, 'behavior', ?, 'upsert', ?, ?, ?, 0)`,
-        crypto.randomUUID(),
+        Crypto.randomUUID(),
         row.id,
         JSON.stringify(row),
-        `${crypto.randomUUID()}:behavior:upsert`,
+        `${Crypto.randomUUID()}:behavior:upsert`,
         now,
       );
     });
@@ -105,10 +107,10 @@ export async function deleteBehaviorReport(id: string): Promise<void> {
       await db.runAsync(
         `INSERT INTO outbox (id, entity, entity_id, op, payload, idempotency_key, created_at, attempts)
          VALUES (?, 'behavior', ?, 'delete', ?, ?, ?, 0)`,
-        crypto.randomUUID(),
+        Crypto.randomUUID(),
         id,
         JSON.stringify({ id }),
-        `${crypto.randomUUID()}:behavior:delete`,
+        `${Crypto.randomUUID()}:behavior:delete`,
         Date.now(),
       );
     });

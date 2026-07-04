@@ -32,14 +32,18 @@ function isBlankRow(row: unknown[] | undefined): boolean {
   return !row || row.length === 0 || row.every((cell) => String(cell ?? '').trim() === '');
 }
 
+async function readUriAsBase64(uri: string): Promise<string> {
+  return FileSystem.readAsStringAsync(uri, {
+    encoding: FileSystem.EncodingType.Base64,
+  });
+}
+
 export async function parseXLS(fileUri: string): Promise<ParsedStudent[]> {
   assertValidExtension(fileUri);
 
   let base64Data: string;
   try {
-    base64Data = await FileSystem.readAsStringAsync(fileUri, {
-      encoding: FileSystem.EncodingType.Base64,
-    });
+    base64Data = await readUriAsBase64(fileUri);
   } catch (error) {
     logger.error('Error leyendo el archivo .XLS', error);
     throw new Error('No se pudo leer el archivo seleccionado.');

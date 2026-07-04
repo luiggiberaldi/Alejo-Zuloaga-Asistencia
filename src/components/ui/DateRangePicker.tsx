@@ -1,8 +1,15 @@
 import { StyleSheet, View } from 'react-native';
 
-import { Button, IconButton, Text } from 'react-native-paper';
+import { DateTimePickerAndroid } from '@react-native-community/datetimepicker';
+import { Button, Text, TouchableRipple } from 'react-native-paper';
 
-import { addDays, formatDateLabel, getTodayString } from '@/components/ui/DateSelector';
+import {
+  addDays,
+  dateToString,
+  formatDateLabel,
+  getTodayString,
+  stringToDate,
+} from '@/components/ui/DateSelector';
 import { colors } from '@/theme';
 
 import type { DateRange } from '@/modules/reports/types';
@@ -28,16 +35,28 @@ export function DateRangePicker({ value, onChange, minDate }: DateRangePickerPro
     onChange({ startDate: start, endDate: today });
   }
 
-  function adjustStart(days: number) {
-    const nextStart = addDays(value.startDate, days);
-    if (nextStart > value.endDate) return;
-    onChange({ ...value, startDate: nextStart });
+  function openStartPicker() {
+    DateTimePickerAndroid.open({
+      value: stringToDate(value.startDate),
+      mode: 'date',
+      minimumDate: stringToDate(minDate),
+      maximumDate: stringToDate(value.endDate),
+      onChange: (_event, date) => {
+        if (date) onChange({ ...value, startDate: dateToString(date) });
+      },
+    });
   }
 
-  function adjustEnd(days: number) {
-    const nextEnd = addDays(value.endDate, days);
-    if (nextEnd < value.startDate || nextEnd > today) return;
-    onChange({ ...value, endDate: nextEnd });
+  function openEndPicker() {
+    DateTimePickerAndroid.open({
+      value: stringToDate(value.endDate),
+      mode: 'date',
+      minimumDate: stringToDate(value.startDate),
+      maximumDate: stringToDate(today),
+      onChange: (_event, date) => {
+        if (date) onChange({ ...value, endDate: dateToString(date) });
+      },
+    });
   }
 
   return (
@@ -76,51 +95,28 @@ export function DateRangePicker({ value, onChange, minDate }: DateRangePickerPro
         </Button>
       </View>
 
-      <View style={styles.pickersColumn}>
-        <View style={styles.dateSelectorContainer}>
-          <Text style={styles.selectorSublabel}>Desde:</Text>
-          <View style={styles.selectorBorder}>
-            <IconButton
-              icon="chevron-left"
-              size={24}
-              style={styles.chevron}
-              onPress={() => adjustStart(-1)}
-              accessibilityLabel="Un día antes desde"
-            />
-            <Text style={styles.dateText}>{formatDateLabel(value.startDate)}</Text>
-            <IconButton
-              icon="chevron-right"
-              size={24}
-              style={styles.chevron}
-              onPress={() => adjustStart(1)}
-              disabled={value.startDate >= value.endDate}
-              accessibilityLabel="Un día después desde"
-            />
+      <View style={styles.fieldsRow}>
+        <TouchableRipple
+          style={styles.dateField}
+          onPress={openStartPicker}
+          accessibilityLabel="Elegir fecha desde"
+        >
+          <View>
+            <Text style={styles.fieldLabel}>Desde</Text>
+            <Text style={styles.fieldValue}>{formatDateLabel(value.startDate)}</Text>
           </View>
-        </View>
+        </TouchableRipple>
 
-        <View style={styles.dateSelectorContainer}>
-          <Text style={styles.selectorSublabel}>Hasta:</Text>
-          <View style={styles.selectorBorder}>
-            <IconButton
-              icon="chevron-left"
-              size={24}
-              style={styles.chevron}
-              onPress={() => adjustEnd(-1)}
-              disabled={value.endDate <= value.startDate}
-              accessibilityLabel="Un día antes hasta"
-            />
-            <Text style={styles.dateText}>{formatDateLabel(value.endDate)}</Text>
-            <IconButton
-              icon="chevron-right"
-              size={24}
-              style={styles.chevron}
-              onPress={() => adjustEnd(1)}
-              disabled={value.endDate >= today}
-              accessibilityLabel="Un día después hasta"
-            />
+        <TouchableRipple
+          style={styles.dateField}
+          onPress={openEndPicker}
+          accessibilityLabel="Elegir fecha hasta"
+        >
+          <View>
+            <Text style={styles.fieldLabel}>Hasta</Text>
+            <Text style={styles.fieldValue}>{formatDateLabel(value.endDate)}</Text>
           </View>
-        </View>
+        </TouchableRipple>
       </View>
     </View>
   );
@@ -154,35 +150,28 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: 'bold',
   },
-  pickersColumn: {
-    flexDirection: 'column',
-  },
-  dateSelectorContainer: {
-    marginBottom: 8,
-  },
-  selectorSublabel: {
-    fontSize: 14,
-    color: '#555',
-    marginBottom: 4,
-  },
-  selectorBorder: {
+  fieldsRow: {
     flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+  },
+  dateField: {
+    flex: 1,
+    marginHorizontal: 4,
     borderWidth: 1,
     borderColor: '#CCC',
     borderRadius: 8,
     backgroundColor: '#FFFFFF',
-    height: 48,
+    minHeight: 48,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    justifyContent: 'center',
   },
-  chevron: {
-    margin: 0,
+  fieldLabel: {
+    fontSize: 12,
+    color: '#555',
   },
-  dateText: {
-    fontSize: 15,
+  fieldValue: {
+    fontSize: 16,
     fontWeight: 'bold',
     color: colors.text,
-    flex: 1,
-    textAlign: 'center',
   },
 });

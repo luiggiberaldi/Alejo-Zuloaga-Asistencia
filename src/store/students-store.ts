@@ -5,6 +5,7 @@ import {
   createStudentsBatch,
   deleteStudent,
   getStudentsBySection,
+  updateStudent,
 } from '@/modules/students/repository';
 import { logger } from '@/services/logger';
 import { useSyncStore } from '@/store/sync-store';
@@ -19,6 +20,7 @@ interface StudentsState {
   addStudent: (input: CreateStudentInput) => Promise<void>;
   addStudentsBatch: (inputs: CreateStudentInput[]) => Promise<void>;
   removeStudent: (id: string) => Promise<void>;
+  updateStudent: (id: string, input: Omit<CreateStudentInput, 'sectionId'>) => Promise<void>;
   clearError: () => void;
 }
 
@@ -77,8 +79,25 @@ export const useStudentsStore = create<StudentsState>((set) => ({
       set((state) => ({ students: state.students.filter((student) => student.id !== id) }));
       useSyncStore.getState().refreshPendingCount();
     } catch (error) {
-      logger.error('Error eliminando estudiante', error);
+      logger.error('Error deleting student', error);
       set({ error: 'No se pudo eliminar el estudiante.' });
+      throw error;
+    }
+  },
+
+  updateStudent: async (id, input) => {
+    set({ error: null });
+    try {
+      const updated = await updateStudent(id, input);
+      set((state) => ({
+        students: sortStudents(
+          state.students.map((student) => (student.id === id ? updated : student)),
+        ),
+      }));
+      useSyncStore.getState().refreshPendingCount();
+    } catch (error) {
+      logger.error('Error updating student', error);
+      set({ error: 'No se pudo actualizar el estudiante.' });
       throw error;
     }
   },

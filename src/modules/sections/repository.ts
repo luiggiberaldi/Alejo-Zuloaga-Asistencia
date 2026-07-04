@@ -1,3 +1,5 @@
+import * as Crypto from 'expo-crypto';
+
 import { getDb } from '@/services/database/client';
 import { logger } from '@/services/logger';
 
@@ -12,14 +14,8 @@ interface SectionRow {
   created_at: number;
   updated_at: number;
   student_count: number;
+  attendance_count?: number;
 }
-
-// Subquery de conteo: SectionCard debe mostrar el número de estudiantes sin
-// que el store tenga que hacer una consulta extra por cada sección.
-const SELECT_SECTIONS = `
-  SELECT s.*, (SELECT COUNT(*) FROM students st WHERE st.section_id = s.id) AS student_count
-  FROM sections s
-`;
 
 function mapRowToSection(row: SectionRow): Section {
   return {
@@ -31,24 +27,59 @@ function mapRowToSection(row: SectionRow): Section {
     createdAt: row.created_at,
     updatedAt: row.updated_at,
     studentCount: row.student_count,
+    attendanceCountForToday: row.attendance_count ?? 0,
   };
 }
 
-export async function getSections(): Promise<Section[]> {
+export async function getSections(todayDate?: string): Promise<Section[]> {
   try {
     const db = await getDb();
-    const rows = await db.getAllAsync<SectionRow>(`${SELECT_SECTIONS} ORDER BY s.created_at DESC`);
-    return rows.map(mapRowToSection);
+    if (todayDate) {
+      const rows = await db.getAllAsync<SectionRow>(
+        `SELECT s.*, 
+                (SELECT COUNT(*) FROM students st WHERE st.section_id = s.id) AS student_count,
+                (SELECT COUNT(*) FROM attendance_records ar 
+                 JOIN students st ON ar.student_id = st.id 
+                 WHERE st.section_id = s.id AND ar.date = ?) AS attendance_count
+         FROM sections s
+         ORDER BY s.created_at DESC`,
+        todayDate
+      );
+      return rows.map(mapRowToSection);
+    } else {
+      const rows = await db.getAllAsync<SectionRow>(
+        `SELECT s.*, 
+                (SELECT COUNT(*) FROM students st WHERE st.section_id = s.id) AS student_count
+         FROM sections s
+         ORDER BY s.created_at DESC`
+      );
+      return rows.map(mapRowToSection);
+    }
   } catch (error) {
     logger.error('Error obteniendo secciones', error);
     throw error;
   }
 }
 
+export async function hasSections(): Promise<boolean> {
+  try {
+    const db = await getDb();
+    const row = await db.getFirstAsync<{ count: number }>('SELECT COUNT(*) as count FROM sections');
+    return (row?.count ?? 0) > 0;
+  } catch (error) {
+    logger.error('Error verificando si existen secciones locales', error);
+    return false; // en caso de error, no bloquear el intento de pull
+  }
+}
+
 export async function getSectionById(id: string): Promise<Section | null> {
   try {
     const db = await getDb();
-    const row = await db.getFirstAsync<SectionRow>(`${SELECT_SECTIONS} WHERE s.id = ?`, id);
+    const row = await db.getFirstAsync<SectionRow>(
+      `SELECT s.*, (SELECT COUNT(*) FROM students st WHERE st.section_id = s.id) AS student_count
+       FROM sections s WHERE s.id = ?`,
+      id,
+    );
     return row ? mapRowToSection(row) : null;
   } catch (error) {
     logger.error('Error obteniendo la sección', error);
@@ -59,7 +90,7 @@ export async function getSectionById(id: string): Promise<Section | null> {
 export async function createSection(input: CreateSectionInput): Promise<Section> {
   const { name, yearLevel, teacherId } = input;
   const now = Date.now();
-  const id = crypto.randomUUID();
+  const id = Crypto.randomUUID();
 
   const row: SectionRow = {
     id,
@@ -94,10 +125,10 @@ export async function createSection(input: CreateSectionInput): Promise<Section>
       await db.runAsync(
         `INSERT INTO outbox (id, entity, entity_id, op, payload, idempotency_key, created_at, attempts)
          VALUES (?, 'section', ?, 'upsert', ?, ?, ?, 0)`,
-        crypto.randomUUID(),
+        Crypto.randomUUID(),
         domainRow.id,
         JSON.stringify(domainRow),
-        `${crypto.randomUUID()}:section:upsert`,
+        `${Crypto.randomUUID()}:section:upsert`,
         now,
       );
     });
@@ -128,10 +159,10 @@ export async function deleteSection(id: string): Promise<void> {
         await db.runAsync(
           `INSERT INTO outbox (id, entity, entity_id, op, payload, idempotency_key, created_at, attempts)
            VALUES (?, 'student', ?, 'delete', ?, ?, ?, 0)`,
-          crypto.randomUUID(),
+          Crypto.randomUUID(),
           student.id,
           JSON.stringify({ id: student.id }),
-          `${crypto.randomUUID()}:student:delete`,
+          `${Crypto.randomUUID()}:student:delete`,
           now,
         );
       }
@@ -141,10 +172,10 @@ export async function deleteSection(id: string): Promise<void> {
       await db.runAsync(
         `INSERT INTO outbox (id, entity, entity_id, op, payload, idempotency_key, created_at, attempts)
          VALUES (?, 'section', ?, 'delete', ?, ?, ?, 0)`,
-        crypto.randomUUID(),
+        Crypto.randomUUID(),
         id,
         JSON.stringify({ id }),
-        `${crypto.randomUUID()}:section:delete`,
+        `${Crypto.randomUUID()}:section:delete`,
         now,
       );
     });

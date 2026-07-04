@@ -1,5 +1,6 @@
 import { Alert } from 'react-native';
 
+import * as Crypto from 'expo-crypto';
 import { create } from 'zustand';
 
 import {
@@ -44,7 +45,7 @@ export const useBehaviorStore = create<BehaviorState>((set, get) => ({
   },
 
   addReport: async (studentId, description, severity, date) => {
-    const tempId = `temp-${crypto.randomUUID()}`;
+    const tempId = `temp-${Crypto.randomUUID()}`;
     const tempReport: BehaviorReport = {
       id: tempId,
       studentId,

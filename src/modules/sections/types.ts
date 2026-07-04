@@ -9,6 +9,7 @@ export interface Section {
   createdAt: number;
   updatedAt: number;
   studentCount: number;
+  attendanceCountForToday?: number;
 }
 
 export interface CreateSectionInput {

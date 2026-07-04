@@ -9,9 +9,12 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { PaperProvider } from 'react-native-paper';
 
 import { fetchUserRole, getCurrentSession } from '@/modules/auth/repository';
+import { hasSections } from '@/modules/sections/repository';
 import { initSchema } from '@/services/database/schema';
 import { supabase } from '@/services/supabase/client';
 import { useAuthStore } from '@/store/auth-store';
+import { useSectionsStore } from '@/store/sections-store';
+import { useSyncStore } from '@/store/sync-store';
 import { colors, paperTheme } from '@/theme';
 
 import type { PropsWithChildren } from 'react';
@@ -29,6 +32,20 @@ function AuthBootstrap({ children }: PropsWithChildren) {
       const role = user ? await fetchUserRole(user.id) : null;
       if (isMounted) setSession(user, role);
       SplashScreen.hideAsync().catch(() => {});
+
+      if (user) {
+        try {
+          const alreadyHasSections = await hasSections();
+          if (!alreadyHasSections) {
+            await useSyncStore.getState().sync();
+            if (isMounted) useSectionsStore.getState().loadSections();
+          }
+        } catch {
+          // Pull inicial silencioso: si falla (sin red, error de servidor, etc.)
+          // no se interrumpe el arranque de la app — el profesor puede
+          // sincronizar manualmente con el botón de sincronizar.
+        }
+      }
     }
 
     bootstrap();

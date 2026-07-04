@@ -9,6 +9,7 @@ interface StudentContextMenuProps {
   onDismiss: () => void;
   studentName: string;
   onReportBehavior: () => void;
+  onEditStudent: () => void;
   onDeleteStudent: () => void;
 }
 
@@ -17,6 +18,7 @@ export function StudentContextMenu({
   onDismiss,
   studentName,
   onReportBehavior,
+  onEditStudent,
   onDeleteStudent,
 }: StudentContextMenuProps) {
   return (
@@ -36,6 +38,16 @@ export function StudentContextMenu({
             onPress={() => {
               onDismiss();
               onReportBehavior();
+            }}
+            titleStyle={styles.itemText}
+            style={styles.item}
+          />
+          <List.Item
+            title="Editar estudiante"
+            left={(props) => <List.Icon {...props} icon="pencil-outline" />}
+            onPress={() => {
+              onDismiss();
+              onEditStudent();
             }}
             titleStyle={styles.itemText}
             style={styles.item}

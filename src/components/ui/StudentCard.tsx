@@ -13,7 +13,8 @@ interface StudentCardProps {
   student: Student;
   attendanceStatus: AttendanceStatus | undefined;
   onAttendanceChange: (status: AttendanceStatus) => void;
-  onLongPress: () => void;
+  onLongPress?: () => void;
+  disabled?: boolean;
 }
 
 export function StudentCard({
@@ -21,22 +22,24 @@ export function StudentCard({
   attendanceStatus,
   onAttendanceChange,
   onLongPress,
+  disabled = false,
 }: StudentCardProps) {
   const [isPressed, setIsPressed] = useState(false);
 
   return (
     <Pressable
-      onPressIn={() => setIsPressed(true)}
+      onPressIn={() => !disabled && setIsPressed(true)}
       onPressOut={() => setIsPressed(false)}
-      onLongPress={onLongPress}
+      onLongPress={!disabled ? onLongPress : undefined}
       delayLongPress={500}
       style={({ pressed }) => [
         styles.pressable,
         {
-          opacity: pressed || isPressed ? 0.85 : 1,
-          transform: [{ scale: pressed || isPressed ? 0.98 : 1 }],
+          opacity: (pressed || isPressed) && !disabled ? 0.85 : 1,
+          transform: [{ scale: (pressed || isPressed) && !disabled ? 0.98 : 1 }],
         },
       ]}
+      disabled={disabled}
     >
       <Card style={styles.card} mode="elevated">
         <Card.Content>
@@ -49,7 +52,11 @@ export function StudentCard({
             </Text>
           </View>
 
-          <AttendanceToggle status={attendanceStatus} onStatusChange={onAttendanceChange} />
+          <AttendanceToggle
+            status={attendanceStatus}
+            onStatusChange={onAttendanceChange}
+            disabled={disabled}
+          />
         </Card.Content>
       </Card>
     </Pressable>

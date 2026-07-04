@@ -1,12 +1,12 @@
 -- Seed users for local development
 -- Note: On remote Supabase, users must be created through Supabase Auth (Dashboard or API)
 
--- 1. Profesor de prueba: profesor@liceo.com
+-- 1. Profesor de prueba: profesor@prueba.com
 INSERT INTO auth.users (id, email, encrypted_password, email_confirmed_at, raw_app_meta_data, raw_user_meta_data, created_at, updated_at, role, aud)
 VALUES (
   'a3bc5d98-12ab-4c3e-89da-0b81a7b4512e',
-  'profesor@liceo.com',
-  crypt('profesor123', gen_salt('bf')),
+  'profesor@prueba.com',
+  crypt('123456789', gen_salt('bf')),
   now(),
   '{"provider":"email","providers":["email"]}',
   '{}',

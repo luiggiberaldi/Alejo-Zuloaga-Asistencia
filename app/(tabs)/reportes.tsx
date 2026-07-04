@@ -25,6 +25,14 @@ import type { DateRange } from '@/modules/reports/types';
 import type { Section } from '@/modules/sections/types';
 import type { Student } from '@/modules/students/types';
 
+function formatDateForFileName(dateStr: string): string {
+  const parts = dateStr.split('-');
+  if (parts.length === 3) {
+    return `${parts[2]}-${parts[1]}-${parts[0]}`;
+  }
+  return dateStr;
+}
+
 export default function ReportesScreen() {
   const sections = useSectionsStore((state) => state.sections);
   const loadSections = useSectionsStore((state) => state.loadSections);
@@ -202,12 +210,15 @@ export default function ReportesScreen() {
 
     setLoadingExport(true);
     try {
+      const startFmt = formatDateForFileName(dateRange.startDate);
+      const endFmt = formatDateForFileName(dateRange.endDate);
+
       if (reportType === 'individual' && selectedStudent) {
         const data = await getStudentReportData(selectedStudent.id, dateRange);
         const secFullName = `${selectedSection.yearLevel} Año "${selectedSection.name}"`;
         const html = generateStudentReportHTML(data, secFullName, dateRange);
 
-        const fileName = `asistencia_${data.student.apellidos}_${data.student.nombres}_${dateRange.startDate}_a_${dateRange.endDate}`;
+        const fileName = `${selectedSection.yearLevel}-seccion-${selectedSection.name}-${data.student.apellidos}-${data.student.nombres}-${startFmt}-al-${endFmt}`;
         await generateAndSharePDF(html, fileName);
       } else {
         const rows = await getSectionReportRows(selectedSection.id, dateRange);
@@ -220,7 +231,7 @@ export default function ReportesScreen() {
         const secFullName = `${selectedSection.yearLevel} Año "${selectedSection.name}"`;
         const html = generateSectionReportHTML(rows, secFullName, dateRange);
 
-        const fileName = `asistencia_seccion_${selectedSection.yearLevel}_${selectedSection.name}_${dateRange.startDate}_a_${dateRange.endDate}`;
+        const fileName = `${selectedSection.yearLevel}-seccion-${selectedSection.name}-${startFmt}-al-${endFmt}`;
         await generateAndSharePDF(html, fileName);
       }
     } catch {

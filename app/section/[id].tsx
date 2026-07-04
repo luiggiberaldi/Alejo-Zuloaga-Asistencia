@@ -1,12 +1,13 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Alert, FlatList, RefreshControl, StyleSheet, View } from 'react-native';
 
-import { Redirect, Stack, useLocalSearchParams } from 'expo-router';
+import { Redirect, Stack, router, useLocalSearchParams } from 'expo-router';
 import { ActivityIndicator, IconButton, Snackbar, Text } from 'react-native-paper';
 
 import { AddStudentModal } from '@/components/ui/AddStudentModal';
 import { BehaviorReportModal } from '@/components/ui/BehaviorReportModal';
 import { DateSelector, getTodayString } from '@/components/ui/DateSelector';
+import { EditStudentModal } from '@/components/ui/EditStudentModal';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { ImportXLSButton } from '@/components/ui/ImportXLSButton';
 import { StudentCard } from '@/components/ui/StudentCard';
@@ -16,6 +17,7 @@ import { getSectionById } from '@/modules/sections/repository';
 import { useAttendanceStore } from '@/store/attendance-store';
 import { useAuthStore } from '@/store/auth-store';
 import { useBehaviorStore } from '@/store/behavior-store';
+import { useSectionsStore } from '@/store/sections-store';
 import { useStudentsStore } from '@/store/students-store';
 import { colors } from '@/theme';
 
@@ -34,6 +36,7 @@ export default function SectionDetailScreen() {
   const loadStudents = useStudentsStore((state) => state.loadStudents);
   const addStudent = useStudentsStore((state) => state.addStudent);
   const removeStudent = useStudentsStore((state) => state.removeStudent);
+  const updateStudent = useStudentsStore((state) => state.updateStudent);
   const clearStudentError = useStudentsStore((state) => state.clearError);
 
   const attendanceByDate = useAttendanceStore((state) => state.attendanceByDate);
@@ -47,9 +50,14 @@ export default function SectionDetailScreen() {
   const behaviorError = useBehaviorStore((state) => state.error);
   const clearBehaviorError = useBehaviorStore((state) => state.clearError);
 
+  const removeSection = useSectionsStore((state) => state.removeSection);
+
+  const role = useAuthStore((state) => state.role);
+
   const [section, setSection] = useState<Section | null>(null);
   const [sectionLoading, setSectionLoading] = useState(true);
   const [addModalVisible, setAddModalVisible] = useState(false);
+  const [editModalVisible, setEditModalVisible] = useState(false);
 
   const [selectedDate, setSelectedDate] = useState<string>(getTodayString());
   const [activeStudent, setActiveStudent] = useState<Student | null>(null);
@@ -77,6 +85,14 @@ export default function SectionDetailScreen() {
       await addStudent({ sectionId: id, cedula, nombres, apellidos });
     },
     [addStudent, id],
+  );
+
+  const handleEditStudent = useCallback(
+    async (cedula: string, nombres: string, apellidos: string) => {
+      if (!activeStudent) return;
+      await updateStudent(activeStudent.id, { cedula, nombres, apellidos });
+    },
+    [updateStudent, activeStudent],
   );
 
   const handleAttendanceChange = useCallback(
@@ -127,6 +143,29 @@ export default function SectionDetailScreen() {
     [removeStudent],
   );
 
+  const handleDeleteSection = useCallback(() => {
+    if (!id || !section) return;
+    Alert.alert(
+      'Eliminar sección',
+      `¿Seguro que deseas eliminar la sección "${section.name}"? Se perderán todos los datos de estudiantes y asistencias asociados de forma local.`,
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        {
+          text: 'Eliminar',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await removeSection(id);
+              router.replace('/(tabs)');
+            } catch {
+              Alert.alert('Error', 'No se pudo eliminar la sección.');
+            }
+          },
+        },
+      ],
+    );
+  }, [id, section, removeSection]);
+
   if (!user) return <Redirect href="/(auth)/login" />;
   if (!id) return null;
 
@@ -150,15 +189,27 @@ export default function SectionDetailScreen() {
           headerTintColor: '#FFFFFF',
           headerRight: () => (
             <View style={styles.headerActions}>
-              <IconButton
-                icon="account-plus"
-                size={24}
-                style={styles.headerButton}
-                iconColor="#FFFFFF"
-                onPress={() => setAddModalVisible(true)}
-                accessibilityLabel="Añadir estudiante"
-              />
-              <ImportXLSButton sectionId={id} />
+              {role === 'profesor' && (
+                <>
+                  <IconButton
+                    icon="trash-can-outline"
+                    size={24}
+                    style={styles.headerButton}
+                    iconColor="#FF8A80"
+                    onPress={handleDeleteSection}
+                    accessibilityLabel="Eliminar sección"
+                  />
+                  <IconButton
+                    icon="account-plus"
+                    size={24}
+                    style={styles.headerButton}
+                    iconColor="#FFFFFF"
+                    onPress={() => setAddModalVisible(true)}
+                    accessibilityLabel="Añadir estudiante"
+                  />
+                  <ImportXLSButton sectionId={id} />
+                </>
+              )}
               <SyncButton />
             </View>
           ),
@@ -198,6 +249,7 @@ export default function SectionDetailScreen() {
                   setActiveStudent(item);
                   setContextMenuVisible(true);
                 }}
+                disabled={role === 'coordinador'}
               />
             )}
             contentContainerStyle={students.length === 0 ? styles.emptyContent : styles.listContent}
@@ -215,7 +267,7 @@ export default function SectionDetailScreen() {
               <EmptyState
                 icon="account-group-outline"
                 title="No hay estudiantes"
-                subtitle="Añádelos manualmente o importa un archivo .XLS"
+                subtitle={role === 'profesor' ? 'Añádelos manualmente o importa un archivo .XLS' : 'No hay estudiantes registrados.'}
               />
             }
           />
@@ -234,7 +286,18 @@ export default function SectionDetailScreen() {
           onDismiss={() => setContextMenuVisible(false)}
           studentName={`${activeStudent.nombres} ${activeStudent.apellidos}`}
           onReportBehavior={() => setBehaviorModalVisible(true)}
+          onEditStudent={() => setEditModalVisible(true)}
           onDeleteStudent={() => handleDeleteStudent(activeStudent)}
+        />
+      )}
+
+      {activeStudent && (
+        <EditStudentModal
+          key={activeStudent.id}
+          visible={editModalVisible}
+          onDismiss={() => setEditModalVisible(false)}
+          student={activeStudent}
+          onSubmit={handleEditStudent}
         />
       )}
 

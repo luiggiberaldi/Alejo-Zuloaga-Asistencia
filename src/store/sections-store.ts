@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 
+import { getTodayString } from '@/components/ui/DateSelector';
 import { createSection, deleteSection, getSections } from '@/modules/sections/repository';
 import { logger } from '@/services/logger';
 import { useAuthStore } from '@/store/auth-store';
@@ -25,7 +26,8 @@ export const useSectionsStore = create<SectionsState>((set) => ({
   loadSections: async () => {
     set({ loading: true, error: null });
     try {
-      const sections = await getSections();
+      const today = getTodayString();
+      const sections = await getSections(today);
       set({ sections, loading: false });
     } catch (error) {
       logger.error('Error cargando secciones', error);

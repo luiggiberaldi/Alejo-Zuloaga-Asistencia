@@ -1,3 +1,5 @@
+import * as Crypto from 'expo-crypto';
+
 import { getDb } from '@/services/database/client';
 import { logger } from '@/services/logger';
 
@@ -29,7 +31,7 @@ function mapRowToStudent(row: StudentRow): Student {
 
 function buildStudentRow(input: CreateStudentInput, now: number): StudentRow {
   return {
-    id: crypto.randomUUID(),
+    id: Crypto.randomUUID(),
     section_id: input.sectionId,
     cedula: input.cedula,
     nombres: input.nombres,
@@ -60,10 +62,10 @@ async function insertStudentRow(
   await db.runAsync(
     `INSERT INTO outbox (id, entity, entity_id, op, payload, idempotency_key, created_at, attempts)
      VALUES (?, 'student', ?, 'upsert', ?, ?, ?, 0)`,
-    crypto.randomUUID(),
+    Crypto.randomUUID(),
     row.id,
     JSON.stringify(row),
-    `${crypto.randomUUID()}:student:upsert`,
+    `${Crypto.randomUUID()}:student:upsert`,
     row.created_at,
   );
 }
@@ -137,15 +139,69 @@ export async function deleteStudent(id: string): Promise<void> {
       await db.runAsync(
         `INSERT INTO outbox (id, entity, entity_id, op, payload, idempotency_key, created_at, attempts)
          VALUES (?, 'student', ?, 'delete', ?, ?, ?, 0)`,
-        crypto.randomUUID(),
+        Crypto.randomUUID(),
         id,
         JSON.stringify({ id }),
-        `${crypto.randomUUID()}:student:delete`,
+        `${Crypto.randomUUID()}:student:delete`,
         Date.now(),
       );
     });
   } catch (error) {
     logger.error('Error eliminando el estudiante', error);
+    throw error;
+  }
+}
+
+export async function updateStudent(
+  id: string,
+  input: Omit<CreateStudentInput, 'sectionId'>,
+): Promise<Student> {
+  try {
+    const db = await getDb();
+    const now = Date.now();
+
+    const existing = await getStudentById(id);
+    if (!existing) {
+      throw new Error('Estudiante no encontrado');
+    }
+
+    const updatedRow: StudentRow = {
+      id,
+      section_id: existing.sectionId,
+      cedula: input.cedula,
+      nombres: input.nombres,
+      apellidos: input.apellidos,
+      synced: 0,
+      created_at: existing.createdAt,
+      updated_at: now,
+    };
+
+    await db.withTransactionAsync(async () => {
+      await db.runAsync(
+        `UPDATE students 
+         SET cedula = ?, nombres = ?, apellidos = ?, synced = 0, updated_at = ?
+         WHERE id = ?`,
+        updatedRow.cedula,
+        updatedRow.nombres,
+        updatedRow.apellidos,
+        updatedRow.updated_at,
+        id,
+      );
+
+      await db.runAsync(
+        `INSERT INTO outbox (id, entity, entity_id, op, payload, idempotency_key, created_at, attempts)
+         VALUES (?, 'student', ?, 'upsert', ?, ?, ?, 0)`,
+        Crypto.randomUUID(),
+        id,
+        JSON.stringify(updatedRow),
+        `${Crypto.randomUUID()}:student:upsert`,
+        now,
+      );
+    });
+
+    return mapRowToStudent(updatedRow);
+  } catch (error) {
+    logger.error('Error actualizando el estudiante', error);
     throw error;
   }
 }

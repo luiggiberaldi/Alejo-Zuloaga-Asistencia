@@ -1,12 +1,13 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useState } from 'react';
 import { FlatList, RefreshControl, StyleSheet, View } from 'react-native';
 
-import { router } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
 import { FAB, Snackbar, Text } from 'react-native-paper';
 
 import { AddSectionModal } from '@/components/ui/AddSectionModal';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { SectionCard } from '@/components/ui/SectionCard';
+import { useAuthStore } from '@/store/auth-store';
 import { useSectionsStore } from '@/store/sections-store';
 import { colors } from '@/theme';
 
@@ -20,11 +21,15 @@ export default function InicioScreen() {
   const addSection = useSectionsStore((state) => state.addSection);
   const clearError = useSectionsStore((state) => state.clearError);
 
+  const role = useAuthStore((state) => state.role);
+
   const [modalVisible, setModalVisible] = useState(false);
 
-  useEffect(() => {
-    loadSections();
-  }, [loadSections]);
+  useFocusEffect(
+    useCallback(() => {
+      loadSections();
+    }, [loadSections])
+  );
 
   const handleCreateSection = useCallback(
     async (name: string, yearLevel: YearLevel) => {
@@ -55,12 +60,14 @@ export default function InicioScreen() {
           <EmptyState
             icon="school-outline"
             title="No hay secciones"
-            subtitle="Crea la primera con el botón +"
+            subtitle={role === 'profesor' ? 'Crea la primera con el botón +' : 'No hay secciones disponibles.'}
           />
         }
       />
 
-      <FAB icon="plus" style={styles.fab} color="#FFFFFF" onPress={() => setModalVisible(true)} />
+      {role === 'profesor' && (
+        <FAB icon="plus" style={styles.fab} color="#FFFFFF" onPress={() => setModalVisible(true)} />
+      )}
 
       <AddSectionModal
         visible={modalVisible}

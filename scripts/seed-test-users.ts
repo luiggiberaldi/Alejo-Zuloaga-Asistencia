@@ -31,8 +31,8 @@ const supabase = createClient(supabaseUrl, serviceRoleKey, {
 
 const usersToCreate = [
   {
-    email: 'profesor.demo@alejozuloaga.edu.ve',
-    password: 'Demo2026Profesor!',
+    email: 'profesor@prueba.com',
+    password: '123456789',
     role: 'profesor',
     yearLevel: '1ro'
   },

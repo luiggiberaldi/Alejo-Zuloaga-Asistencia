@@ -10,6 +10,7 @@ import { colors } from '@/theme';
 export default function LoginScreen() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const setSession = useAuthStore((state) => state.setSession);
@@ -51,10 +52,16 @@ export default function LoginScreen() {
       <TextInput
         label="Contraseña"
         mode="outlined"
-        secureTextEntry
+        secureTextEntry={!showPassword}
         value={password}
         onChangeText={setPassword}
         style={styles.input}
+        right={
+          <TextInput.Icon
+            icon={showPassword ? 'eye-off' : 'eye'}
+            onPress={() => setShowPassword(!showPassword)}
+          />
+        }
       />
 
       <Button

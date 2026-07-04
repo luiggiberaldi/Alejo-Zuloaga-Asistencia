@@ -3,6 +3,7 @@ import { StyleSheet } from 'react-native';
 
 import { Button, Modal, Portal, SegmentedButtons, Text, TextInput } from 'react-native-paper';
 
+import { useSectionsStore } from '@/store/sections-store';
 import { colors } from '@/theme';
 
 import type { YearLevel } from '@/modules/sections/types';
@@ -26,9 +27,17 @@ export function AddSectionModal({ visible, onDismiss, onSubmit }: AddSectionModa
   const [yearLevel, setYearLevel] = useState<YearLevel>('1ro');
   const [submitting, setSubmitting] = useState(false);
 
+  const error = useSectionsStore((state) => state.error);
+  const clearError = useSectionsStore((state) => state.clearError);
+
   function reset() {
     setName('');
     setYearLevel('1ro');
+  }
+
+  function handleDismiss() {
+    clearError();
+    onDismiss();
   }
 
   async function handleSubmit() {
@@ -36,9 +45,9 @@ export function AddSectionModal({ visible, onDismiss, onSubmit }: AddSectionModa
     try {
       await onSubmit(name.trim(), yearLevel);
       reset();
-      onDismiss();
+      handleDismiss();
     } catch {
-      // El error se refleja en sections-store.error y se muestra en la pantalla.
+      // El error se refleja en sections-store.error
     } finally {
       setSubmitting(false);
     }
@@ -46,7 +55,7 @@ export function AddSectionModal({ visible, onDismiss, onSubmit }: AddSectionModa
 
   return (
     <Portal>
-      <Modal visible={visible} onDismiss={onDismiss} contentContainerStyle={styles.container}>
+      <Modal visible={visible} onDismiss={handleDismiss} contentContainerStyle={styles.container}>
         <Text variant="titleLarge" style={styles.title}>
           Nueva sección
         </Text>
@@ -65,9 +74,19 @@ export function AddSectionModal({ visible, onDismiss, onSubmit }: AddSectionModa
         <SegmentedButtons
           value={yearLevel}
           onValueChange={(value) => setYearLevel(value as YearLevel)}
-          buttons={YEAR_OPTIONS}
+          buttons={YEAR_OPTIONS.map((opt) => ({
+            ...opt,
+            style: styles.segmentedButton,
+            labelStyle: styles.segmentedButtonLabel,
+          }))}
           style={styles.input}
         />
+
+        {error ? (
+          <Text variant="bodyMedium" style={styles.errorText}>
+            {error}
+          </Text>
+        ) : null}
 
         <Button
           mode="contained"
@@ -100,6 +119,22 @@ const styles = StyleSheet.create({
   },
   input: {
     marginBottom: 16,
+  },
+  segmentedButton: {
+    flex: 1,
+    minWidth: 0,
+  },
+  segmentedButtonLabel: {
+    fontSize: 12,
+    marginHorizontal: 0,
+    paddingHorizontal: 0,
+  },
+  errorText: {
+    color: colors.danger,
+    marginBottom: 16,
+    fontSize: 14,
+    textAlign: 'center',
+    fontWeight: 'bold',
   },
   buttonContent: {
     height: 48,

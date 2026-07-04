@@ -4,6 +4,11 @@ import { ActivityIndicator, Alert, StyleSheet, View } from 'react-native';
 import { Badge, IconButton, Portal, Snackbar } from 'react-native-paper';
 
 import { useNetworkStatus } from '@/hooks/useNetworkStatus';
+import { getDailySummaryData } from '@/modules/reports/repository';
+import { logger } from '@/services/logger';
+import { generateAndSharePDF } from '@/services/pdf/generator';
+import { generateDailySummaryHTML } from '@/services/pdf/templates';
+import { useAuthStore } from '@/store/auth-store';
 import { useSyncStore } from '@/store/sync-store';
 
 import type { SyncStatus } from '@/modules/sync/types';
@@ -45,6 +50,29 @@ export function SyncButton() {
           setSnackbarMessage(
             `Sincronización exitosa: ${result.pushed} enviados, ${result.pulled} descargados.`,
           );
+
+          // Generar y abrir PDF del resumen diario para el profesor
+          const user = useAuthStore.getState().user;
+          const role = useAuthStore.getState().role;
+          if (user && role === 'profesor') {
+            const today = new Date().toISOString().split('T')[0];
+            try {
+              const summaries = await getDailySummaryData(user.id, today);
+              const html = generateDailySummaryHTML(user.email ?? 'Docente', today, summaries);
+              // Pequeño delay para no tapar visualmente el Snackbar
+              setTimeout(async () => {
+                try {
+                  const parts = today.split('-');
+                  const todayFmt = parts.length === 3 ? `${parts[2]}-${parts[1]}-${parts[0]}` : today;
+                  await generateAndSharePDF(html, `Resumen-Diario-${todayFmt}`);
+                } catch (pdfErr) {
+                  logger.error('Error al generar PDF de sincronización', pdfErr);
+                }
+              }, 800);
+            } catch (dataErr) {
+              logger.error('Error al obtener datos para PDF diario', dataErr);
+            }
+          }
         }
         setSnackbarVisible(true);
       }

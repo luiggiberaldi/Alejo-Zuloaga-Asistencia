@@ -1,3 +1,5 @@
+import * as Crypto from 'expo-crypto';
+
 import { getDb } from '@/services/database/client';
 import { logger } from '@/services/logger';
 
@@ -42,7 +44,7 @@ export async function setAttendance(
       );
 
       const now = Date.now();
-      const id = existing ? existing.id : crypto.randomUUID();
+      const id = existing ? existing.id : Crypto.randomUUID();
       const createdAt = existing ? existing.created_at : now;
       const updatedAt = now;
 
@@ -81,10 +83,10 @@ export async function setAttendance(
       await db.runAsync(
         `INSERT INTO outbox (id, entity, entity_id, op, payload, idempotency_key, created_at, attempts)
          VALUES (?, 'attendance', ?, 'upsert', ?, ?, ?, 0)`,
-        crypto.randomUUID(),
+        Crypto.randomUUID(),
         row.id,
         JSON.stringify(row),
-        `${crypto.randomUUID()}:attendance:upsert`,
+        `${Crypto.randomUUID()}:attendance:upsert`,
         now,
       );
 

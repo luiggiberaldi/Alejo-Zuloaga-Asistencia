@@ -15,6 +15,7 @@ export default {
     plugins: [
       'expo-router',
       'expo-sharing',
+      '@react-native-community/datetimepicker',
       [
         'expo-splash-screen',
         {

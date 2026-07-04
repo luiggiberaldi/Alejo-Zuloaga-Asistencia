@@ -130,9 +130,11 @@ export function generateStudentReportHTML(
       <meta charset="utf-8">
       <style>
         body { font-family: system-ui, -apple-system, sans-serif; color: #212121; line-height: 1.5; padding: 30px; margin: 0; }
-        .header { text-align: center; margin-bottom: 25px; border-bottom: 3px solid #1B5E20; padding-bottom: 15px; }
-        .header h1 { color: #1B5E20; margin: 0; font-size: 22px; font-weight: bold; }
-        .header p { margin: 5px 0 0 0; color: #555; font-size: 14px; }
+        .header { display: flex; align-items: center; margin-bottom: 25px; border-bottom: 3px solid #1B5E20; padding-bottom: 15px; }
+        .header-logo { width: 65px; height: 65px; object-fit: contain; margin-right: 20px; }
+        .header-text { flex: 1; }
+        .header-text h1 { color: #1B5E20; margin: 0; font-size: 20px; font-weight: bold; }
+        .header-text p { margin: 5px 0 0 0; color: #555; font-size: 13px; }
         .info-card { background-color: #F5F5F5; padding: 15px; border-radius: 8px; margin-bottom: 25px; border-left: 5px solid #1B5E20; }
         .info-card table { width: 100%; }
         .info-card td { padding: 4px 8px; font-size: 14px; }
@@ -150,8 +152,11 @@ export function generateStudentReportHTML(
     </head>
     <body>
       <div class="header">
-        <h1>Complejo Educativo Alejo Zuloaga</h1>
-        <p>Alejo Zuloaga Asistencia — Reporte Individual de Asistencia</p>
+        <img class="header-logo" src="{{LOGO_BASE64}}" alt="Logo" onerror="this.style.display='none'" />
+        <div class="header-text">
+          <h1>Complejo Educativo Alejo Zuloaga</h1>
+          <p>Alejo Zuloaga Asistencia — Reporte Individual de Asistencia</p>
+        </div>
       </div>
 
       <div class="info-card">
@@ -303,9 +308,11 @@ export function generateSectionReportHTML(
       <meta charset="utf-8">
       <style>
         body { font-family: system-ui, -apple-system, sans-serif; color: #212121; line-height: 1.5; padding: 30px; margin: 0; }
-        .header { text-align: center; margin-bottom: 25px; border-bottom: 3px solid #1B5E20; padding-bottom: 15px; }
-        .header h1 { color: #1B5E20; margin: 0; font-size: 22px; font-weight: bold; }
-        .header p { margin: 5px 0 0 0; color: #555; font-size: 14px; }
+        .header { display: flex; align-items: center; margin-bottom: 25px; border-bottom: 3px solid #1B5E20; padding-bottom: 15px; }
+        .header-logo { width: 65px; height: 65px; object-fit: contain; margin-right: 20px; }
+        .header-text { flex: 1; }
+        .header-text h1 { color: #1B5E20; margin: 0; font-size: 20px; font-weight: bold; }
+        .header-text p { margin: 5px 0 0 0; color: #555; font-size: 13px; }
         .info-card { background-color: #F5F5F5; padding: 12px 15px; border-radius: 8px; margin-bottom: 25px; border-left: 5px solid #1B5E20; }
         .info-card table { width: 100%; }
         .info-card td { padding: 4px 8px; font-size: 14px; }
@@ -321,8 +328,11 @@ export function generateSectionReportHTML(
     </head>
     <body>
       <div class="header">
-        <h1>Complejo Educativo Alejo Zuloaga</h1>
-        <p>Alejo Zuloaga Asistencia — Reporte de Sección</p>
+        <img class="header-logo" src="{{LOGO_BASE64}}" alt="Logo" onerror="this.style.display='none'" />
+        <div class="header-text">
+          <h1>Complejo Educativo Alejo Zuloaga</h1>
+          <p>Alejo Zuloaga Asistencia — Reporte de Sección</p>
+        </div>
       </div>
 
       <div class="info-card">
@@ -372,6 +382,146 @@ export function generateSectionReportHTML(
       <div class="footer">
         Reporte consolidado de sección generado por Alejo Zuloaga Asistencia el ${generatedAt}.<br/>
         Rango de análisis: ${rangeStartLabel} - ${rangeEndLabel}.
+      </div>
+    </body>
+    </html>`;
+}
+
+export interface DailySectionSummary {
+  sectionName: string;
+  yearLevel: string;
+  totalStudents: number;
+  presentCount: number;
+  absentCount: number;
+  absentStudents: { nombres: string; apellidos: string; cedula: string }[];
+}
+
+export function generateDailySummaryHTML(
+  teacherEmail: string,
+  date: string,
+  summaries: DailySectionSummary[],
+): string {
+  const generatedAt = formatDateSpanish(date);
+  const escEmail = escapeHtml(teacherEmail);
+
+  let sectionsHTML = '';
+  let absenteesHTML = '';
+
+  if (summaries.length === 0) {
+    sectionsHTML = `
+      <tr>
+        <td colspan="5" style="padding: 12px; text-align: center; color: #666; font-style: italic;">
+          No hay secciones registradas para este docente.
+        </td>
+      </tr>`;
+  } else {
+    sectionsHTML = summaries
+      .map((s) => {
+        const total = s.totalStudents;
+        const rate = total > 0 ? Math.round((s.presentCount / total) * 100) : 0;
+        return `
+        <tr>
+          <td style="padding: 10px; border-bottom: 1px solid #E0E0E0;"><b>${escapeHtml(s.yearLevel)} Año "${escapeHtml(s.sectionName)}"</b></td>
+          <td style="padding: 10px; border-bottom: 1px solid #E0E0E0; text-align: center;">${s.totalStudents}</td>
+          <td style="padding: 10px; border-bottom: 1px solid #E0E0E0; text-align: center; color: #2E7D32; font-weight: bold;">${s.presentCount}</td>
+          <td style="padding: 10px; border-bottom: 1px solid #E0E0E0; text-align: center; color: #C62828; font-weight: bold;">${s.absentCount}</td>
+          <td style="padding: 10px; border-bottom: 1px solid #E0E0E0; text-align: center; font-weight: bold; color: #1B5E20;">${rate}%</td>
+        </tr>`;
+      })
+      .join('');
+
+    const sectionsWithAbsentees = summaries.filter((s) => s.absentStudents.length > 0);
+    if (sectionsWithAbsentees.length === 0) {
+      absenteesHTML = `<p style="font-style: italic; color: #666; font-size: 14px;">No hubo inasistencias reportadas el día de hoy.</p>`;
+    } else {
+      absenteesHTML = sectionsWithAbsentees
+        .map((s) => {
+          const list = s.absentStudents
+            .map(
+              (student) =>
+                `<li>${escapeHtml(student.apellidos)}, ${escapeHtml(student.nombres)} (C.I. ${escapeHtml(student.cedula)})</li>`,
+            )
+            .join('');
+          return `
+          <div style="margin-bottom: 15px; page-break-inside: avoid;">
+            <h3 style="color: #C62828; margin: 0 0 5px 0; font-size: 15px;">${escapeHtml(s.yearLevel)} Año "${escapeHtml(s.sectionName)}"</h3>
+            <ul style="margin: 0; padding-left: 20px; font-size: 14px; color: #333;">
+              ${list}
+            </ul>
+          </div>`;
+        })
+        .join('');
+    }
+  }
+
+  return `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="utf-8">
+      <style>
+        body { font-family: system-ui, -apple-system, sans-serif; color: #212121; line-height: 1.5; padding: 30px; margin: 0; }
+        .header { display: flex; align-items: center; margin-bottom: 25px; border-bottom: 3px solid #1B5E20; padding-bottom: 15px; }
+        .header-logo { width: 65px; height: 65px; object-fit: contain; margin-right: 20px; }
+        .header-text { flex: 1; }
+        .header-text h1 { color: #1B5E20; margin: 0; font-size: 20px; font-weight: bold; }
+        .header-text p { margin: 5px 0 0 0; color: #555; font-size: 13px; }
+        .info-card { background-color: #F5F5F5; padding: 12px 15px; border-radius: 8px; margin-bottom: 25px; border-left: 5px solid #1B5E20; }
+        .info-card table { width: 100%; }
+        .info-card td { padding: 4px 8px; font-size: 14px; }
+        .info-card td.label { font-weight: bold; color: #555; width: 120px; }
+        .section-title { color: #1B5E20; font-size: 16px; border-bottom: 2px solid #1B5E20; padding-bottom: 5px; margin-top: 30px; margin-bottom: 15px; font-weight: bold; }
+        table.data-table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
+        table.data-table th { background-color: #1B5E20; color: white; padding: 10px; font-size: 12px; font-weight: bold; text-align: center; text-transform: uppercase; }
+        table.data-table th.left { text-align: left; }
+        table.data-table td { padding: 8px 10px; border-bottom: 1px solid #E0E0E0; font-size: 13px; }
+        .footer { text-align: center; font-size: 11px; color: #888; margin-top: 50px; border-top: 1px solid #E0E0E0; padding-top: 15px; }
+      </style>
+    </head>
+    <body>
+      <div class="header">
+        <img class="header-logo" src="{{LOGO_BASE64}}" alt="Logo" onerror="this.style.display='none'" />
+        <div class="header-text">
+          <h1>Complejo Educativo Alejo Zuloaga</h1>
+          <p>Alejo Zuloaga Asistencia — Resumen Diario de Asistencia</p>
+        </div>
+      </div>
+
+      <div class="info-card">
+        <table>
+          <tr>
+            <td class="label">Docente:</td>
+            <td><b>${escEmail}</b></td>
+          </tr>
+          <tr>
+            <td class="label">Fecha del Reporte:</td>
+            <td>${generatedAt}</td>
+          </tr>
+        </table>
+      </div>
+
+      <div class="section-title">Resumen por Sección</div>
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th class="left">Sección</th>
+            <th style="width: 100px;">Matrícula</th>
+            <th style="width: 100px;">Presentes</th>
+            <th style="width: 100px;">Ausentes</th>
+            <th style="width: 120px;">% Asistencia</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${sectionsHTML}
+        </tbody>
+      </table>
+
+      <div class="section-title" style="color: #C62828; border-bottom-color: #C62828;">Detalle de Inasistencias (Alumnos Ausentes)</div>
+      ${absenteesHTML}
+
+      <div class="footer">
+        Reporte automático generado tras sincronización con la nube de Supabase.<br/>
+        Alejo Zuloaga Asistencia — ${generatedAt}.
       </div>
     </body>
     </html>`;
