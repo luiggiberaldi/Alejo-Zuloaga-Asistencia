@@ -1,10 +1,11 @@
-import { Asset } from 'expo-asset';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
 import { Alert, Platform } from 'react-native';
 
 import { logger } from '@/services/logger';
+
+import { LOGO_BASE64 } from './logo-base64';
 
 const { StorageAccessFramework } = FileSystem;
 
@@ -18,46 +19,13 @@ export function sanitizeFileName(name: string): string {
     .substring(0, 50); // Truncar a 50 caracteres
 }
 
-async function getLogoBase64(): Promise<string> {
-  try {
-    const asset = Asset.fromModule(require('../../../assets/images/logo.png'));
-    await asset.downloadAsync();
-    
-    let localUri = asset.localUri;
-    
-    if (!localUri && asset.uri) {
-      if (asset.uri.startsWith('http://') || asset.uri.startsWith('https://')) {
-        const cachePath = `${FileSystem.cacheDirectory}logo_temp.png`;
-        const downloadResult = await FileSystem.downloadAsync(asset.uri, cachePath);
-        localUri = downloadResult.uri;
-      } else {
-        localUri = asset.uri;
-      }
-    }
-
-    if (!localUri) {
-      logger.warn('No se pudo determinar una URI local para el logo');
-      return '';
-    }
-
-    const base64 = await FileSystem.readAsStringAsync(localUri, {
-      encoding: 'base64',
-    });
-    return `data:image/png;base64,${base64}`;
-  } catch (error) {
-    logger.error('Error al cargar el logo para PDF', error);
-    return '';
-  }
-}
-
 export async function generateAndSharePDF(html: string, fileName: string): Promise<void> {
   try {
     const sanitized = sanitizeFileName(fileName);
     const targetFileName = `${sanitized}.pdf`;
 
     // 1. Cargar e inyectar el logo
-    const logoBase64 = await getLogoBase64();
-    const finalHtml = html.replace(/\{\{LOGO_BASE64\}\}/g, logoBase64);
+    const finalHtml = html.replace(/\{\{LOGO_BASE64\}\}/g, LOGO_BASE64);
 
     // 2. Generar PDF temporal en caché
     const { uri } = await Print.printToFileAsync({ html: finalHtml });
