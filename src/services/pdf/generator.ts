@@ -30,22 +30,22 @@ export async function generateAndSharePDF(html: string, fileName: string): Promi
     // 2. Generar PDF temporal en caché
     const { uri } = await Print.printToFileAsync({ html: finalHtml });
 
-    if (Platform.OS === 'ios') {
-      // En iOS podemos copiar el archivo para renombrarlo sin problemas
-      let shareUri = uri;
-      try {
-        const targetUri = `${FileSystem.cacheDirectory}${targetFileName}`;
-        await FileSystem.deleteAsync(targetUri, { idempotent: true });
-        await FileSystem.copyAsync({
-          from: uri,
-          to: targetUri,
-        });
-        shareUri = targetUri;
-        await FileSystem.deleteAsync(uri, { idempotent: true });
-      } catch (fsError) {
-        logger.warn('No se pudo renombrar el archivo PDF en iOS', fsError);
-      }
+    // 3. Renombrar el archivo temporal con el nombre estructurado en la caché
+    let shareUri = uri;
+    try {
+      const targetUri = `${FileSystem.cacheDirectory}${targetFileName}`;
+      await FileSystem.deleteAsync(targetUri, { idempotent: true });
+      await FileSystem.copyAsync({
+        from: uri,
+        to: targetUri,
+      });
+      shareUri = targetUri;
+      await FileSystem.deleteAsync(uri, { idempotent: true });
+    } catch (fsError) {
+      logger.warn('No se pudo renombrar el archivo PDF en caché', fsError);
+    }
 
+    if (Platform.OS === 'ios') {
       // 3. Verificar si se puede compartir y proceder
       const isSharingAvailable = await Sharing.isAvailableAsync();
       if (!isSharingAvailable) {
@@ -78,7 +78,7 @@ export async function generateAndSharePDF(html: string, fileName: string): Promi
                     'application/pdf'
                   );
                   
-                  const base64Data = await FileSystem.readAsStringAsync(uri, {
+                  const base64Data = await FileSystem.readAsStringAsync(shareUri, {
                     encoding: 'base64',
                   });
                   
@@ -92,7 +92,7 @@ export async function generateAndSharePDF(html: string, fileName: string): Promi
                   );
                   
                   // Limpiar el archivo temporal
-                  await FileSystem.deleteAsync(uri, { idempotent: true });
+                  await FileSystem.deleteAsync(shareUri, { idempotent: true });
                 }
               } catch (saveError) {
                 logger.error('Error al guardar PDF en dispositivo Android', saveError);
@@ -115,7 +115,7 @@ export async function generateAndSharePDF(html: string, fileName: string): Promi
                   );
                   return;
                 }
-                await Sharing.shareAsync(uri, {
+                await Sharing.shareAsync(shareUri, {
                   mimeType: 'application/pdf',
                   dialogTitle: 'Compartir reporte de asistencia',
                 });
@@ -133,7 +133,7 @@ export async function generateAndSharePDF(html: string, fileName: string): Promi
             style: 'cancel',
             onPress: async () => {
               // Limpiar el archivo temporal
-              await FileSystem.deleteAsync(uri, { idempotent: true });
+              await FileSystem.deleteAsync(shareUri, { idempotent: true });
             },
           },
         ],
