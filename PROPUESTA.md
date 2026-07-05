@@ -69,7 +69,11 @@ Todo funciona **sin necesidad de internet** durante la clase — los datos se gu
 
 ## Demostración del MVP
 
-Para evaluar las funcionalidades del MVP, se facilitarán las credenciales de acceso de forma directa y confidencial al momento de coordinar la sesión de demostración. Contactar al desarrollador por los medios indicados al final de este documento.
+Para evaluar las funcionalidades del MVP (Demostración), puede iniciar sesión utilizando las siguientes credenciales pre-configuradas:
+
+*   **Rol de Docente (Profesor):**
+    *   **Correo Electrónico:** `profesor@prueba.com`
+    *   **Contraseña:** `123456789`
 
 ---
 
