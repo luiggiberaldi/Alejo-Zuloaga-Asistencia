@@ -16,6 +16,9 @@ Este archivo contiene el estado actual del proyecto, las decisiones clave de dis
 4. **Seguridad contra cuelgues de inicialización (Splash Screen):**
    * El cliente de Supabase no debe lanzar excepciones de inicialización de nivel superior si faltan las variables de entorno. Se agregaron valores fallback (`placeholder`) en `src/services/supabase/client.ts`.
    * El archivo `app.config.js` lee directamente `.env.local` al compilar la APK de producción para asegurar que las credenciales queden embebidas en el bundle de JavaScript incluso si la terminal del build no tiene las variables de entorno definidas.
+5. **Limpieza de Datos al Cerrar Sesión (Seguridad & Consistencia):**
+   * Al cerrar sesión, la base de datos SQLite local se vacía completamente (`DELETE FROM` en todas las tablas). Esto evita fugas de información entre diferentes docentes que usen el mismo dispositivo.
+   * Si existen cambios pendientes en el `outbox` al cerrar sesión, se advierte al usuario con opciones para sincronizar primero o continuar perdiendo los cambios locales. Esto previene que se queden cambios "huérfanos" en el dispositivo que luego se intenten sincronizar bajo otra cuenta de usuario.
 
 ## 🛠️ Historial de Tareas y Cambios Recientes
 * **Descarga de PDFs en Android (SAF):** Integración nativa de Storage Access Framework para descargar PDFs permanentemente y envío estructurado a la caché temporal para compartir por WhatsApp.
@@ -26,8 +29,9 @@ Este archivo contiene el estado actual del proyecto, las decisiones clave de dis
 * **Sincronización en Lote (Bulk Push):** El `sync-manager` procesa eventos del outbox agrupándolos por entidad y operación, reduciendo las llamadas de red. Tiene fallback uno-a-uno automático si falla un lote (por ejemplo, por RLS).
 * **Consistencia de Borrados:** Al borrar una sección o estudiante, se eliminan localmente sus hijos (asistencia/conducta), se limpian eventos `upsert` pendientes en el `outbox` y se encola un evento `delete` ordenado.
 * **Resolución de Error Splash Screen APK:** Se añadieron las protecciones contra errores de inicialización en `src/services/supabase/client.ts` y la lectura manual de `.env.local` en `app.config.js` durante el empaquetado.
+* **Control y Limpieza en Cierre de Sesión:** Implementación de `clearAllLocalData` para vaciar las tablas de SQLite en el logout y advertencias interactivas de cambios pendientes en [ajustes.tsx](file:///c:/Users/luigg/Desktop/demo%20app liceo/app/%28tabs%29/ajustes.tsx).
 
 ## 🚀 Próximos Pasos Recomendados
 1. **Prueba de la Nueva APK:** Instalar la nueva compilación APK en dispositivos de prueba y verificar que ya no se queda congelada en la pantalla de carga inicial.
 2. **Simulación de Sincronización Manual:** Iniciar sesión, borrar una sección o estudiante localmente, y pulsar el botón de nube en la barra de sincronización para validar que se eliminen completamente de Supabase.
-3. **Evaluación de Rendimiento en Red Lenta:** Probar la subida en lote con más de 20 estudiantes creados en local simulando velocidad de red 3G.
+3. **Evaluación de Cierre de Sesión:** Probar cerrar sesión con cambios pendientes para verificar la alerta y la correcta limpieza del almacenamiento local.
