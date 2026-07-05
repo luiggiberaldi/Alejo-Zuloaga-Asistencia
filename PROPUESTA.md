@@ -1,7 +1,7 @@
 # Propuesta de Piloto: Alejo Zuloaga Asistencia
 
-**Preparado para:** _[Nombre del profesor/a]_
-**Preparado por:** Luigi Berardi
+**Preparado para:** Autoridades del Complejo Educativo Alejo Zuloaga
+**Preparado por:** Luigi Berardi — Synaptica
 **Fecha:** 4 de julio de 2026
 **Institución:** Complejo Educativo Alejo Zuloaga — Valencia, Carabobo
 
@@ -11,7 +11,9 @@
 
 **Alejo Zuloaga Asistencia** es una aplicación móvil para Android, diseñada específicamente para docentes del liceo, que digitaliza el proceso de toma de asistencia y registro de comportamiento estudiantil — sin depender de una conexión a internet constante. Reemplaza el cuaderno de asistencia en papel por una herramienta simple, rápida y que genera reportes profesionales en PDF con un par de toques.
 
-Esta propuesta invita a **[Nombre del profesor/a]** a ser el primer usuario piloto de la aplicación, probándola durante sus clases reales antes de proponer su adopción a nivel institucional.
+> **Nota:** La versión actual de la aplicación es un **Producto Mínimo Viable (MVP)**. Esto significa que la herramienta es completamente **editable y mejorable** en base a la retroalimentación, ideas y necesidades específicas que surjan durante el uso diario en el liceo.
+
+Esta propuesta invita a la institución a iniciar un plan piloto de la aplicación con sus docentes, probándola en clases reales antes de su adopción definitiva.
 
 ---
 
@@ -65,16 +67,9 @@ Todo funciona **sin necesidad de internet** durante la clase — los datos se gu
 
 ---
 
-## Credenciales de prueba para la demostración
+## Demostración del MVP
 
-Para evaluar las funcionalidades del MVP (Demostración), puede iniciar sesión utilizando las siguientes credenciales pre-configuradas:
-
-*   **Rol de Docente (Profesor):**
-    *   **Correo Electrónico:** `profesor@prueba.com`
-    *   **Contraseña:** `123456789`
-*   **Rol de Coordinación (Coordinador):**
-    *   **Correo Electrónico:** `coordinador.demo@alejozuloaga.edu.ve`
-    *   **Contraseña:** `Demo2026Coord!`
+Para evaluar las funcionalidades del MVP, se facilitarán las credenciales de acceso de forma directa y confidencial al momento de coordinar la sesión de demostración. Contactar al desarrollador por los medios indicados al final de este documento.
 
 ---
 
@@ -94,13 +89,13 @@ Para evaluar las funcionalidades del MVP (Demostración), puede iniciar sesión 
 | **2. Uso real en clase** | 2 a 4 semanas | El docente usa la app en su rutina diaria de toma de asistencia |
 | **3. Retroalimentación** | 1 reunión breve al cierre | Recoger impresiones, dificultades y sugerencias antes de proponer la adopción institucional |
 
-Durante todo el piloto, el desarrollador está disponible para resolver dudas o incidencias que puedan surgir.
+Durante todo el piloto, el desarrollador está disponible para resolver dudas o incidencias por WhatsApp o correo electrónico en horario extendido (lunes a sábado).
 
 ---
 
-## Alcance futuro (fuera de esta versión inicial)
+## Alcance futuro (roadmap de crecimiento)
 
-Estas funcionalidades ya están identificadas para futuras versiones, dependiendo de los resultados del piloto:
+Estas funcionalidades están identificadas para versiones posteriores, activables según los resultados del piloto y las necesidades de la institución:
 
 - Rol de coordinador con vista consolidada de múltiples secciones y años.
 - Notificaciones automáticas a representantes ante inasistencias.
@@ -110,20 +105,21 @@ Estas funcionalidades ya están identificadas para futuras versiones, dependiend
 
 ## Inversión
 
-_[A definir — sección a completar según el modelo de costo acordado: costo único de desarrollo, costo por licencia/dispositivo, o a definir tras evaluar los resultados del piloto.]_
+La inversión única por el desarrollo del Producto Mínimo Viable (MVP), su despliegue y puesta en marcha es de **$150** (incluye la aplicación móvil con base de datos local SQLite, soporte offline completo y sincronización automática con la nube, más soporte técnico directo durante el período del piloto).
 
 ---
 
 ## Próximos pasos
 
-1. Revisar esta propuesta y la demostración (MVP) adjunta.
-2. Coordinar la sesión de instalación y capacitación inicial.
-3. Comenzar el piloto en la(s) sección(es) que el docente indique.
+1. Revisar esta propuesta y coordinar una sesión de demostración del MVP.
+2. Confirmar la(s) sección(es) participantes y agendar la instalación y capacitación inicial.
+3. Comenzar el piloto con soporte continuo del desarrollador.
 
 ---
 
 ## Contacto
 
 **Luigi Berardi**
-Desarrollador — Alejo Zuloaga Asistencia
-_[correo / teléfono de contacto]_
+Jefe de Desarrolladores de Software — Synaptica
+📧 synapcitaia@gmail.com
+📱 0412-405-1793
