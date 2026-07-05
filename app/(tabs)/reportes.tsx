@@ -6,6 +6,7 @@ import { ActivityIndicator } from 'react-native-paper';
 import { DateRangePicker } from '@/components/ui/DateRangePicker';
 import { addDays, getTodayString } from '@/components/ui/DateSelector';
 import { EmptyState } from '@/components/ui/EmptyState';
+import { PdfShareModal } from '@/components/ui/PdfShareModal';
 import { ReportPreviewCard } from '@/components/ui/ReportPreviewCard';
 import { ReportTypeToggle } from '@/components/ui/ReportTypeToggle';
 import { SectionPicker } from '@/components/ui/SectionPicker';
@@ -16,7 +17,7 @@ import {
   getStudentReportData,
 } from '@/modules/reports/repository';
 import { getStudentsBySection } from '@/modules/students/repository';
-import { generateAndSharePDF } from '@/services/pdf/generator';
+import { savePDFToDevice, sharePDFDirectly } from '@/services/pdf/generator';
 import { generateSectionReportHTML, generateStudentReportHTML } from '@/services/pdf/templates';
 import { useSectionsStore } from '@/store/sections-store';
 import { colors } from '@/theme';
@@ -70,6 +71,7 @@ export default function ReportesScreen() {
 
   const [loadingPreview, setLoadingPreview] = useState(false);
   const [loadingExport, setLoadingExport] = useState(false);
+  const [pdfAction, setPdfAction] = useState<{ html: string; fileName: string } | null>(null);
 
   // Cargar secciones al montar
   useEffect(() => {
@@ -219,7 +221,7 @@ export default function ReportesScreen() {
         const html = generateStudentReportHTML(data, secFullName, dateRange);
 
         const fileName = `${selectedSection.yearLevel}-seccion-${selectedSection.name}-${data.student.apellidos}-${data.student.nombres}-${startFmt}-al-${endFmt}`;
-        await generateAndSharePDF(html, fileName);
+        setPdfAction({ html, fileName });
       } else {
         const rows = await getSectionReportRows(selectedSection.id, dateRange);
         if (rows.length === 0) {
@@ -232,10 +234,10 @@ export default function ReportesScreen() {
         const html = generateSectionReportHTML(rows, secFullName, dateRange);
 
         const fileName = `${selectedSection.yearLevel}-seccion-${selectedSection.name}-${startFmt}-al-${endFmt}`;
-        await generateAndSharePDF(html, fileName);
+        setPdfAction({ html, fileName });
       }
     } catch {
-      // Error ya se maneja y reporta internamente en generateAndSharePDF
+      // Error ya se maneja y reporta internamente en getStudentReportData/getSectionReportRows
     } finally {
       setLoadingExport(false);
     }
@@ -294,6 +296,13 @@ export default function ReportesScreen() {
         porcentajeAsistencia={previewData.porcentajeAsistencia}
         hasData={previewData.hasData}
         onExport={handleExportPDF}
+      />
+
+      <PdfShareModal
+        visible={!!pdfAction}
+        onDismiss={() => setPdfAction(null)}
+        onSave={() => pdfAction && savePDFToDevice(pdfAction.html, pdfAction.fileName)}
+        onShare={() => pdfAction && sharePDFDirectly(pdfAction.html, pdfAction.fileName)}
       />
     </ScrollView>
   );
