@@ -53,9 +53,8 @@ async function buildPdfFile(html: string, fileName: string): Promise<PdfFile> {
 }
 
 export async function savePDFToDevice(html: string, fileName: string): Promise<void> {
-  const { uri, targetFileName } = await buildPdfFile(html, fileName);
-
   try {
+    const { uri, targetFileName } = await buildPdfFile(html, fileName);
     const permissions = await StorageAccessFramework.requestDirectoryPermissionsAsync();
     if (!permissions.granted) return;
 
@@ -78,9 +77,8 @@ export async function savePDFToDevice(html: string, fileName: string): Promise<v
 }
 
 export async function sharePDFDirectly(html: string, fileName: string): Promise<void> {
-  const { uri } = await buildPdfFile(html, fileName);
-
   try {
+    const { uri } = await buildPdfFile(html, fileName);
     const isSharingAvailable = await Sharing.isAvailableAsync();
     if (!isSharingAvailable) {
       Alert.alert('Compartir no disponible', 'La opción de compartir no está disponible en este dispositivo.');

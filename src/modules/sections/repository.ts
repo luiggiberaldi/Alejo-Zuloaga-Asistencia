@@ -155,6 +155,30 @@ export async function deleteSection(id: string): Promise<void> {
       );
 
       for (const student of studentIds) {
+        // Limpiar eventos pendientes de asistencia/comportamiento/estudiante
+        // para no dejar 'upsert' viejos que referencien una fila que nunca
+        // se sincronizo (fallarian RLS al no encontrar el padre en remoto).
+        const attendanceIds = await db.getAllAsync<{ id: string }>(
+          'SELECT id FROM attendance_records WHERE student_id = ?',
+          student.id,
+        );
+        for (const record of attendanceIds) {
+          await db.runAsync('DELETE FROM outbox WHERE entity = ? AND entity_id = ?', 'attendance', record.id);
+        }
+
+        const behaviorIds = await db.getAllAsync<{ id: string }>(
+          'SELECT id FROM behavior_reports WHERE student_id = ?',
+          student.id,
+        );
+        for (const report of behaviorIds) {
+          await db.runAsync('DELETE FROM outbox WHERE entity = ? AND entity_id = ?', 'behavior', report.id);
+        }
+
+        await db.runAsync('DELETE FROM outbox WHERE entity = ? AND entity_id = ?', 'student', student.id);
+
+        // Eliminar registros locales en SQLite para evitar huérfanos dado que foreign_keys = OFF
+        await db.runAsync('DELETE FROM attendance_records WHERE student_id = ?', student.id);
+        await db.runAsync('DELETE FROM behavior_reports WHERE student_id = ?', student.id);
         await db.runAsync('DELETE FROM students WHERE id = ?', student.id);
         await db.runAsync(
           `INSERT INTO outbox (id, entity, entity_id, op, payload, idempotency_key, created_at, attempts)
@@ -166,6 +190,8 @@ export async function deleteSection(id: string): Promise<void> {
           now,
         );
       }
+
+      await db.runAsync('DELETE FROM outbox WHERE entity = ? AND entity_id = ?', 'section', id);
 
       await db.runAsync('DELETE FROM sections WHERE id = ?', id);
 

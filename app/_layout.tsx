@@ -21,6 +21,23 @@ import type { PropsWithChildren } from 'react';
 
 SplashScreen.preventAutoHideAsync().catch(() => {});
 
+// En el primer arranque en frío (justo después de instalar), hideAsync()
+// puede fallar silenciosamente si el módulo nativo de splash screen aún no
+// terminó de registrarse — sin reintento, el splash queda pegado hasta que
+// se cierra y reabre la app manualmente. Reintentamos unas cuantas veces.
+async function hideSplashWithRetry(retries = 4): Promise<void> {
+  for (let attempt = 0; attempt < retries; attempt++) {
+    try {
+      await SplashScreen.hideAsync();
+      return;
+    } catch {
+      if (attempt < retries - 1) {
+        await new Promise((resolve) => setTimeout(resolve, 300));
+      }
+    }
+  }
+}
+
 function AuthBootstrap({ children }: PropsWithChildren) {
   const setSession = useAuthStore((state) => state.setSession);
 
@@ -28,10 +45,14 @@ function AuthBootstrap({ children }: PropsWithChildren) {
     let isMounted = true;
 
     async function bootstrap() {
-      const user = await getCurrentSession();
-      const role = user ? await fetchUserRole(user.id) : null;
-      if (isMounted) setSession(user, role);
-      SplashScreen.hideAsync().catch(() => {});
+      let user = null;
+      try {
+        user = await getCurrentSession();
+        const role = user ? await fetchUserRole(user.id) : null;
+        if (isMounted) setSession(user, role);
+      } finally {
+        await hideSplashWithRetry();
+      }
 
       if (user) {
         try {

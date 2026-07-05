@@ -102,6 +102,10 @@ export async function deleteBehaviorReport(id: string): Promise<void> {
   try {
     const db = await getDb();
     await db.withTransactionAsync(async () => {
+      // Limpiar un 'upsert' pendiente de este mismo reporte, si lo hay, para
+      // no dejarlo referenciando una fila que ya no existira localmente.
+      await db.runAsync('DELETE FROM outbox WHERE entity = ? AND entity_id = ?', 'behavior', id);
+
       await db.runAsync('DELETE FROM behavior_reports WHERE id = ?', id);
 
       await db.runAsync(

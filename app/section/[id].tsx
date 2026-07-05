@@ -16,6 +16,7 @@ import { StudentContextMenu } from '@/components/ui/StudentContextMenu';
 import { SyncButton } from '@/components/ui/SyncButton';
 import { getSectionDailySummary } from '@/modules/reports/repository';
 import { getSectionById } from '@/modules/sections/repository';
+import { logger } from '@/services/logger';
 import { savePDFToDevice, sharePDFDirectly } from '@/services/pdf/generator';
 import { generateDailySummaryHTML } from '@/services/pdf/templates';
 import { useAttendanceStore } from '@/store/attendance-store';
@@ -130,11 +131,15 @@ export default function SectionDetailScreen() {
         await markAttendance(studentId, selectedDate, status);
 
         const index = students.findIndex((s) => s.id === studentId);
-        const isLastVisible =
-          index !== -1 && viewableIndicesRef.current.length > 0 &&
-          index === Math.max(...viewableIndicesRef.current);
+        // Dispara el auto-scroll al marcar la última o penúltima tarjeta
+        // visible, para que el avance se sienta fluido y no haga falta
+        // tocar justo el borde inferior de la pantalla.
+        const lastTwoVisible = [...viewableIndicesRef.current]
+          .sort((a, b) => b - a)
+          .slice(0, 2);
+        const isNearBottom = index !== -1 && lastTwoVisible.includes(index);
 
-        if (isLastVisible && index + 1 < students.length) {
+        if (isNearBottom && index + 1 < students.length) {
           flatListRef.current?.scrollToIndex({
             index: index + 1,
             viewPosition: 0.7,
@@ -179,9 +184,16 @@ export default function SectionDetailScreen() {
 
   const handleDownloadSummary = useCallback(async () => {
     if (!section) return;
+    let html: string | null;
     try {
-      const html = await buildDailySummaryHtml();
-      if (!html) return;
+      html = await buildDailySummaryHtml();
+    } catch (error) {
+      logger.error('Error al construir el resumen diario para descargar', error);
+      Alert.alert('Error', 'No se pudo generar el resumen del día. Por favor, intenta de nuevo.');
+      return;
+    }
+    if (!html) return;
+    try {
       await savePDFToDevice(html, `Resumen_${section.name}_${selectedDate}`);
     } catch {
       // Error ya se maneja y reporta dentro de savePDFToDevice
@@ -190,9 +202,16 @@ export default function SectionDetailScreen() {
 
   const handleShareSummary = useCallback(async () => {
     if (!section) return;
+    let html: string | null;
     try {
-      const html = await buildDailySummaryHtml();
-      if (!html) return;
+      html = await buildDailySummaryHtml();
+    } catch (error) {
+      logger.error('Error al construir el resumen diario para compartir', error);
+      Alert.alert('Error', 'No se pudo generar el resumen del día. Por favor, intenta de nuevo.');
+      return;
+    }
+    if (!html) return;
+    try {
       await sharePDFDirectly(html, `Resumen_${section.name}_${selectedDate}`);
     } catch {
       // Error ya se maneja y reporta dentro de sharePDFDirectly

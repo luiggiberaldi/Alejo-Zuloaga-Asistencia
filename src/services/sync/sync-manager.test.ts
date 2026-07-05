@@ -52,6 +52,7 @@ function createSupabaseFromMock(overrides: Record<string, { data?: unknown[]; er
       upsert: jest.fn().mockResolvedValue({ error: tableOverride.error ?? null }),
       delete: jest.fn(() => ({
         eq: jest.fn().mockResolvedValue({ error: tableOverride.error ?? null }),
+        in: jest.fn().mockResolvedValue({ error: tableOverride.error ?? null }),
       })),
       select: jest.fn(() => ({
         gt: jest.fn().mockResolvedValue({ data: tableOverride.data ?? [], error: null }),
@@ -147,5 +148,19 @@ describe('syncNow', () => {
     const gtMock = selectMock.mock.results[0].value.gt as jest.Mock;
     expect(gtMock).toHaveBeenCalledWith('updated_at', '1970-01-01T00:00:00.000Z');
     expect(result.pulled).toBe(1);
+  });
+
+  it('elimina en lote las entidades con evento de tipo delete', async () => {
+    mockNetInfoFetch.mockResolvedValue({ isConnected: true } as any);
+    mockGetPendingEvents.mockResolvedValue([
+      buildEvent({ id: 'event-delete-1', op: 'delete', entity: 'section', entityId: 'section-to-delete' })
+    ]);
+
+    const result = await syncNow();
+
+    expect(mockSupabaseFrom).toHaveBeenCalledWith('sections');
+    expect(mockRemoveEvent).toHaveBeenCalledWith('event-delete-1');
+    expect(result.pushed).toBe(1);
+    expect(result.failed).toBe(0);
   });
 });
