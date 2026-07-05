@@ -23,3 +23,21 @@ export function getDb(): Promise<SQLiteDatabase> {
   }
   return dbPromise;
 }
+
+export async function clearAllLocalData(): Promise<void> {
+  try {
+    const db = await getDb();
+    await db.withTransactionAsync(async () => {
+      await db.runAsync('DELETE FROM outbox');
+      await db.runAsync('DELETE FROM sync_meta');
+      await db.runAsync('DELETE FROM behavior_reports');
+      await db.runAsync('DELETE FROM attendance_records');
+      await db.runAsync('DELETE FROM students');
+      await db.runAsync('DELETE FROM sections');
+    });
+    logger.info('Datos locales limpiados con éxito (Logout)');
+  } catch (error) {
+    logger.error('Error al limpiar los datos locales en el logout', error);
+    throw error;
+  }
+}

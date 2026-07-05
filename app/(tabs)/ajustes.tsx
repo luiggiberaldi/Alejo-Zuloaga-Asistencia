@@ -5,6 +5,8 @@ import Constants from 'expo-constants';
 import { Button, List, Snackbar } from 'react-native-paper';
 
 import { signOutUser } from '@/modules/auth/repository';
+import { clearAllLocalData } from '@/services/database/client';
+import { logger } from '@/services/logger';
 import { useAuthStore } from '@/store/auth-store';
 import { useSyncStore } from '@/store/sync-store';
 import { colors } from '@/theme';
@@ -35,15 +37,76 @@ export default function AjustesScreen() {
 
   const [snackbarMessage, setSnackbarMessage] = useState<string | null>(null);
 
+  const [loggingOut, setLoggingOut] = useState(false);
+
+  async function performLogout() {
+    setLoggingOut(true);
+    try {
+      await clearAllLocalData();
+      await signOutUser();
+    } catch (error) {
+      logger.error('Error durante el cierre de sesión', error);
+      Alert.alert('Error', 'No se pudo limpiar la base de datos local al cerrar sesión.');
+    } finally {
+      setLoggingOut(false);
+    }
+  }
+
   function handleSignOut() {
-    Alert.alert('Cerrar sesión', '¿Seguro que deseas cerrar tu sesión?', [
-      { text: 'Cancelar', style: 'cancel' },
-      {
-        text: 'Cerrar sesión',
-        style: 'destructive',
-        onPress: () => signOutUser(),
-      },
-    ]);
+    if (loggingOut) return;
+
+    if (pendingCount > 0) {
+      Alert.alert(
+        'Cambios sin sincronizar',
+        `Tienes ${pendingCount} cambio(s) pendiente(s) por subir a la nube. Si cierras sesión sin sincronizar, se perderán de forma permanente.`,
+        [
+          { text: 'Cancelar', style: 'cancel' },
+          {
+            text: 'Sincronizar y Salir',
+            onPress: async () => {
+              try {
+                const res = await sync();
+                if (res && res.failed === 0) {
+                  await performLogout();
+                } else {
+                  Alert.alert(
+                    'Sincronización incompleta',
+                    'Algunos cambios no se pudieron sincronizar. ¿Deseas cerrar sesión de todos modos perdiendo los cambios?',
+                    [
+                      { text: 'Cancelar', style: 'cancel' },
+                      { text: 'Salir de todos modos', style: 'destructive', onPress: performLogout }
+                    ]
+                  );
+                }
+              } catch (err: any) {
+                Alert.alert(
+                  'Error de sincronización',
+                  `No se pudo sincronizar: ${err.message || 'Sin conexión'}. ¿Deseas cerrar sesión de todos modos?`,
+                  [
+                    { text: 'Cancelar', style: 'cancel' },
+                    { text: 'Salir de todos modos', style: 'destructive', onPress: performLogout }
+                  ]
+                );
+              }
+            }
+          },
+          {
+            text: 'Salir de todos modos',
+            style: 'destructive',
+            onPress: performLogout,
+          },
+        ]
+      );
+    } else {
+      Alert.alert('Cerrar sesión', '¿Seguro que deseas cerrar tu sesión?', [
+        { text: 'Cancelar', style: 'cancel' },
+        {
+          text: 'Cerrar sesión',
+          style: 'destructive',
+          onPress: performLogout,
+        },
+      ]);
+    }
   }
 
   async function handleSyncNow() {
