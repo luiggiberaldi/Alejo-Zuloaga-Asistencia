@@ -215,67 +215,91 @@ export interface DailySectionSummary {
   absentStudents: { nombres: string; apellidos: string; cedula: string }[];
 }
 
+export async function getSectionDailySummary(
+  sectionId: string,
+  sectionName: string,
+  yearLevel: string,
+  date: string,
+): Promise<DailySectionSummary> {
+  try {
+    return await computeSectionDailySummary(sectionId, sectionName, yearLevel, date);
+  } catch (error) {
+    logger.error('Error al obtener el resumen diario de la sección', error);
+    throw error;
+  }
+}
+
+async function computeSectionDailySummary(
+  sectionId: string,
+  sectionName: string,
+  yearLevel: string,
+  date: string,
+): Promise<DailySectionSummary> {
+  const db = await getDb();
+
+  // 1. Obtener matrícula (matrícula total de la sección)
+  const countRes = await db.getFirstAsync<{ count: number }>(
+    'SELECT COUNT(*) as count FROM students WHERE section_id = ?',
+    sectionId,
+  );
+  const totalStudents = countRes?.count || 0;
+
+  // 2. Obtener conteo de presentes hoy
+  const presentRes = await db.getFirstAsync<{ count: number }>(
+    `SELECT COUNT(*) as count FROM attendance_records ar
+     JOIN students s ON ar.student_id = s.id
+     WHERE s.section_id = ? AND ar.date = ? AND ar.status = 'presente'`,
+    sectionId,
+    date,
+  );
+  const presentCount = presentRes?.count || 0;
+
+  // 3. Obtener conteo de ausentes hoy
+  const absentRes = await db.getFirstAsync<{ count: number }>(
+    `SELECT COUNT(*) as count FROM attendance_records ar
+     JOIN students s ON ar.student_id = s.id
+     WHERE s.section_id = ? AND ar.date = ? AND ar.status = 'ausente'`,
+    sectionId,
+    date,
+  );
+  const absentCount = absentRes?.count || 0;
+
+  // 4. Obtener lista de alumnos ausentes hoy
+  const absentStudents = await db.getAllAsync<{ nombres: string; apellidos: string; cedula: string }>(
+    `SELECT s.nombres, s.apellidos, s.cedula FROM attendance_records ar
+     JOIN students s ON ar.student_id = s.id
+     WHERE s.section_id = ? AND ar.date = ? AND ar.status = 'ausente'
+     ORDER BY s.apellidos, s.nombres`,
+    sectionId,
+    date,
+  );
+
+  return {
+    sectionName,
+    yearLevel,
+    totalStudents,
+    presentCount,
+    absentCount,
+    absentStudents: absentStudents || [],
+  };
+}
+
 export async function getDailySummaryData(
   teacherId: string,
   date: string,
 ): Promise<DailySectionSummary[]> {
   try {
     const db = await getDb();
-    
-    // 1. Obtener las secciones del profesor
+
+    // Obtener las secciones del profesor
     const sections = await db.getAllAsync<{ id: string; name: string; year_level: string }>(
       'SELECT id, name, year_level FROM sections WHERE teacher_id = ? ORDER BY year_level, name',
       teacherId,
     );
 
     const summaries: DailySectionSummary[] = [];
-
     for (const sec of sections) {
-      // 2. Obtener matrícula (matrícula total de la sección)
-      const countRes = await db.getFirstAsync<{ count: number }>(
-        'SELECT COUNT(*) as count FROM students WHERE section_id = ?',
-        sec.id,
-      );
-      const totalStudents = countRes?.count || 0;
-
-      // 3. Obtener conteo de presentes hoy
-      const presentRes = await db.getFirstAsync<{ count: number }>(
-        `SELECT COUNT(*) as count FROM attendance_records ar
-         JOIN students s ON ar.student_id = s.id
-         WHERE s.section_id = ? AND ar.date = ? AND ar.status = 'presente'`,
-        sec.id,
-        date,
-      );
-      const presentCount = presentRes?.count || 0;
-
-      // 4. Obtener conteo de ausentes hoy
-      const absentRes = await db.getFirstAsync<{ count: number }>(
-        `SELECT COUNT(*) as count FROM attendance_records ar
-         JOIN students s ON ar.student_id = s.id
-         WHERE s.section_id = ? AND ar.date = ? AND ar.status = 'ausente'`,
-        sec.id,
-        date,
-      );
-      const absentCount = absentRes?.count || 0;
-
-      // 5. Obtener lista de alumnos ausentes hoy
-      const absentStudents = await db.getAllAsync<{ nombres: string; apellidos: string; cedula: string }>(
-        `SELECT s.nombres, s.apellidos, s.cedula FROM attendance_records ar
-         JOIN students s ON ar.student_id = s.id
-         WHERE s.section_id = ? AND ar.date = ? AND ar.status = 'ausente'
-         ORDER BY s.apellidos, s.nombres`,
-        sec.id,
-        date,
-      );
-
-      summaries.push({
-        sectionName: sec.name,
-        yearLevel: sec.year_level,
-        totalStudents,
-        presentCount,
-        absentCount,
-        absentStudents: absentStudents || [],
-      });
+      summaries.push(await computeSectionDailySummary(sec.id, sec.name, sec.year_level, date));
     }
 
     return summaries;

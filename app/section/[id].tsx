@@ -1,10 +1,11 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Alert, FlatList, RefreshControl, StyleSheet, View } from 'react-native';
 
 import { Redirect, Stack, router, useLocalSearchParams } from 'expo-router';
 import { ActivityIndicator, IconButton, Snackbar, Text } from 'react-native-paper';
 
 import { AddStudentModal } from '@/components/ui/AddStudentModal';
+import { AttendanceCompletionModal } from '@/components/ui/AttendanceCompletionModal';
 import { BehaviorReportModal } from '@/components/ui/BehaviorReportModal';
 import { DateSelector, getTodayString } from '@/components/ui/DateSelector';
 import { EditStudentModal } from '@/components/ui/EditStudentModal';
@@ -13,18 +14,26 @@ import { ImportXLSButton } from '@/components/ui/ImportXLSButton';
 import { StudentCard } from '@/components/ui/StudentCard';
 import { StudentContextMenu } from '@/components/ui/StudentContextMenu';
 import { SyncButton } from '@/components/ui/SyncButton';
+import { getSectionDailySummary } from '@/modules/reports/repository';
 import { getSectionById } from '@/modules/sections/repository';
+import { savePDFToDevice, sharePDFDirectly } from '@/services/pdf/generator';
+import { generateDailySummaryHTML } from '@/services/pdf/templates';
 import { useAttendanceStore } from '@/store/attendance-store';
 import { useAuthStore } from '@/store/auth-store';
 import { useBehaviorStore } from '@/store/behavior-store';
 import { useSectionsStore } from '@/store/sections-store';
 import { useStudentsStore } from '@/store/students-store';
+import { useSyncStore } from '@/store/sync-store';
 import { colors } from '@/theme';
+
+import type { ViewToken } from 'react-native';
 
 import type { AttendanceStatus } from '@/modules/attendance/types';
 import type { BehaviorSeverity } from '@/modules/behavior/types';
 import type { Section } from '@/modules/sections/types';
 import type { Student } from '@/modules/students/types';
+
+const VIEWABILITY_CONFIG = { itemVisiblePercentThreshold: 60 };
 
 export default function SectionDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -63,6 +72,20 @@ export default function SectionDetailScreen() {
   const [activeStudent, setActiveStudent] = useState<Student | null>(null);
   const [contextMenuVisible, setContextMenuVisible] = useState(false);
   const [behaviorModalVisible, setBehaviorModalVisible] = useState(false);
+  const [completionVisible, setCompletionVisible] = useState(false);
+  const [completionCounts, setCompletionCounts] = useState<{ presentes: number; ausentes: number }>({
+    presentes: 0,
+    ausentes: 0,
+  });
+
+  const flatListRef = useRef<FlatList<Student>>(null);
+  const viewableIndicesRef = useRef<number[]>([]);
+  const wasCompleteRef = useRef(false);
+  const onViewableItemsChanged = useCallback(({ viewableItems }: { viewableItems: ViewToken[] }) => {
+    viewableIndicesRef.current = viewableItems
+      .map((item) => item.index)
+      .filter((index): index is number => index !== null);
+  }, []);
 
   useEffect(() => {
     if (!id) return;
@@ -73,6 +96,12 @@ export default function SectionDetailScreen() {
 
     loadStudents(id);
   }, [id, loadStudents]);
+
+  // Reinicia la bandera de "asistencia completa" al cambiar de sección, fecha
+  // o cuando cambia el tamaño del alumnado (ej. se añade un estudiante nuevo).
+  useEffect(() => {
+    wasCompleteRef.current = false;
+  }, [id, selectedDate, students.length]);
 
   useEffect(() => {
     if (!id) return;
@@ -99,12 +128,71 @@ export default function SectionDetailScreen() {
     async (studentId: string, status: AttendanceStatus) => {
       try {
         await markAttendance(studentId, selectedDate, status);
+
+        const index = students.findIndex((s) => s.id === studentId);
+        const isLastVisible =
+          index !== -1 && viewableIndicesRef.current.length > 0 &&
+          index === Math.max(...viewableIndicesRef.current);
+
+        if (isLastVisible && index + 1 < students.length) {
+          flatListRef.current?.scrollToIndex({ index: index + 1, viewPosition: 1, animated: true });
+        }
+
+        // Detectar finalización: todos los estudiantes ya tienen asistencia
+        // marcada para esta fecha (se lee el store directamente para tomar el
+        // valor más reciente, sin esperar al siguiente render).
+        const freshMap = useAttendanceStore.getState().attendanceByDate;
+        const isComplete = students.length > 0 && students.every((s) => freshMap[s.id] !== undefined);
+
+        if (isComplete && !wasCompleteRef.current) {
+          wasCompleteRef.current = true;
+          const presentes = students.filter((s) => freshMap[s.id] === 'presente').length;
+          const ausentes = students.length - presentes;
+          setCompletionCounts({ presentes, ausentes });
+          setCompletionVisible(true);
+        } else if (!isComplete) {
+          wasCompleteRef.current = false;
+        }
       } catch {
         // Rollback y alert ya son manejados por el store
       }
     },
-    [markAttendance, selectedDate],
+    [markAttendance, selectedDate, students],
   );
+
+  const buildDailySummaryHtml = useCallback(async () => {
+    if (!id || !section) return null;
+    const summary = await getSectionDailySummary(id, section.name, section.yearLevel, selectedDate);
+    return generateDailySummaryHTML(user?.email ?? 'Docente', selectedDate, [summary]);
+  }, [id, section, selectedDate, user]);
+
+  const handleUploadToCloud = useCallback(() => {
+    useSyncStore.getState().sync().catch(() => {
+      // Error ya se maneja y reporta dentro del store de sync
+    });
+  }, []);
+
+  const handleDownloadSummary = useCallback(async () => {
+    if (!section) return;
+    try {
+      const html = await buildDailySummaryHtml();
+      if (!html) return;
+      await savePDFToDevice(html, `Resumen_${section.name}_${selectedDate}`);
+    } catch {
+      // Error ya se maneja y reporta dentro de savePDFToDevice
+    }
+  }, [buildDailySummaryHtml, section, selectedDate]);
+
+  const handleShareSummary = useCallback(async () => {
+    if (!section) return;
+    try {
+      const html = await buildDailySummaryHtml();
+      if (!html) return;
+      await sharePDFDirectly(html, `Resumen_${section.name}_${selectedDate}`);
+    } catch {
+      // Error ya se maneja y reporta dentro de sharePDFDirectly
+    }
+  }, [buildDailySummaryHtml, section, selectedDate]);
 
   const handleReportBehavior = useCallback(
     async (description: string, severity: BehaviorSeverity) => {
@@ -238,6 +326,7 @@ export default function SectionDetailScreen() {
           )}
 
           <FlatList
+            ref={flatListRef}
             data={students}
             keyExtractor={(item) => item.id}
             renderItem={({ item }) => (
@@ -252,6 +341,11 @@ export default function SectionDetailScreen() {
                 disabled={role === 'coordinador'}
               />
             )}
+            viewabilityConfig={VIEWABILITY_CONFIG}
+            onViewableItemsChanged={onViewableItemsChanged}
+            onScrollToIndexFailed={(info) => {
+              flatListRef.current?.scrollToOffset({ offset: info.averageItemLength * info.index, animated: true });
+            }}
             contentContainerStyle={students.length === 0 ? styles.emptyContent : styles.listContent}
             refreshControl={
               <RefreshControl
@@ -312,6 +406,16 @@ export default function SectionDetailScreen() {
       <Snackbar visible={!!activeError} onDismiss={handleClearError} duration={4000}>
         {activeError ?? ''}
       </Snackbar>
+
+      <AttendanceCompletionModal
+        visible={completionVisible}
+        onDismiss={() => setCompletionVisible(false)}
+        presentCount={completionCounts.presentes}
+        absentCount={completionCounts.ausentes}
+        onUploadToCloud={handleUploadToCloud}
+        onDownloadSummary={handleDownloadSummary}
+        onShareSummary={handleShareSummary}
+      />
     </View>
   );
 }
