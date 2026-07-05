@@ -130,9 +130,9 @@ export function generateStudentReportHTML(
       <meta charset="utf-8">
       <style>
         body { font-family: system-ui, -apple-system, sans-serif; color: #212121; line-height: 1.5; padding: 30px; margin: 0; }
-        .header { display: flex; align-items: center; margin-bottom: 25px; border-bottom: 3px solid #1B5E20; padding-bottom: 15px; }
-        .header-logo { width: 65px; height: 65px; object-fit: contain; margin-right: 20px; }
-        .header-text { flex: 1; }
+        .header { display: flex; flex-direction: column; align-items: center; text-align: center; margin-bottom: 25px; border-bottom: 3px solid #1B5E20; padding-bottom: 15px; }
+        .header-logo { width: 65px; height: 65px; object-fit: contain; margin-bottom: 10px; }
+        .header-text { width: 100%; }
         .header-text h1 { color: #1B5E20; margin: 0; font-size: 20px; font-weight: bold; }
         .header-text p { margin: 5px 0 0 0; color: #555; font-size: 13px; }
         .info-card { background-color: #F5F5F5; padding: 15px; border-radius: 8px; margin-bottom: 25px; border-left: 5px solid #1B5E20; }
@@ -308,9 +308,9 @@ export function generateSectionReportHTML(
       <meta charset="utf-8">
       <style>
         body { font-family: system-ui, -apple-system, sans-serif; color: #212121; line-height: 1.5; padding: 30px; margin: 0; }
-        .header { display: flex; align-items: center; margin-bottom: 25px; border-bottom: 3px solid #1B5E20; padding-bottom: 15px; }
-        .header-logo { width: 65px; height: 65px; object-fit: contain; margin-right: 20px; }
-        .header-text { flex: 1; }
+        .header { display: flex; flex-direction: column; align-items: center; text-align: center; margin-bottom: 25px; border-bottom: 3px solid #1B5E20; padding-bottom: 15px; }
+        .header-logo { width: 65px; height: 65px; object-fit: contain; margin-bottom: 10px; }
+        .header-text { width: 100%; }
         .header-text h1 { color: #1B5E20; margin: 0; font-size: 20px; font-weight: bold; }
         .header-text p { margin: 5px 0 0 0; color: #555; font-size: 13px; }
         .info-card { background-color: #F5F5F5; padding: 12px 15px; border-radius: 8px; margin-bottom: 25px; border-left: 5px solid #1B5E20; }
@@ -461,9 +461,9 @@ export function generateDailySummaryHTML(
       <meta charset="utf-8">
       <style>
         body { font-family: system-ui, -apple-system, sans-serif; color: #212121; line-height: 1.5; padding: 30px; margin: 0; }
-        .header { display: flex; align-items: center; margin-bottom: 25px; border-bottom: 3px solid #1B5E20; padding-bottom: 15px; }
-        .header-logo { width: 65px; height: 65px; object-fit: contain; margin-right: 20px; }
-        .header-text { flex: 1; }
+        .header { display: flex; flex-direction: column; align-items: center; text-align: center; margin-bottom: 25px; border-bottom: 3px solid #1B5E20; padding-bottom: 15px; }
+        .header-logo { width: 65px; height: 65px; object-fit: contain; margin-bottom: 10px; }
+        .header-text { width: 100%; }
         .header-text h1 { color: #1B5E20; margin: 0; font-size: 20px; font-weight: bold; }
         .header-text p { margin: 5px 0 0 0; color: #555; font-size: 13px; }
         .info-card { background-color: #F5F5F5; padding: 12px 15px; border-radius: 8px; margin-bottom: 25px; border-left: 5px solid #1B5E20; }

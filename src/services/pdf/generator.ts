@@ -46,7 +46,7 @@ export async function generateAndSharePDF(html: string, fileName: string): Promi
     }
 
     if (Platform.OS === 'ios') {
-      // 3. Verificar si se puede compartir y proceder
+      // Verificar si se puede compartir y proceder
       const isSharingAvailable = await Sharing.isAvailableAsync();
       if (!isSharingAvailable) {
         Alert.alert(
@@ -58,16 +58,16 @@ export async function generateAndSharePDF(html: string, fileName: string): Promi
 
       await Sharing.shareAsync(shareUri, {
         mimeType: 'application/pdf',
-        dialogTitle: 'Compartir reporte de asistencia',
+        dialogTitle: 'Compartir Reporte de Asistencia',
       });
     } else {
       // En Android, se pregunta al usuario si desea guardar en el dispositivo o compartir
       Alert.alert(
-        'Reporte Generado',
-        '¿Qué deseas hacer con el reporte de asistencia?',
+        'Reporte de Asistencia',
+        'El documento PDF ha sido generado correctamente. Seleccione una opción para proceder:',
         [
           {
-            text: 'Descargar / Guardar',
+            text: 'Guardar en Dispositivo',
             onPress: async () => {
               try {
                 const permissions = await StorageAccessFramework.requestDirectoryPermissionsAsync();
@@ -87,8 +87,8 @@ export async function generateAndSharePDF(html: string, fileName: string): Promi
                   });
                   
                   Alert.alert(
-                    'Guardado',
-                    'El reporte se ha guardado exitosamente en tu dispositivo.'
+                    'Archivo Guardado',
+                    'El reporte se ha almacenado correctamente en la ubicación seleccionada.'
                   );
                   
                   // Limpiar el archivo temporal
@@ -97,8 +97,8 @@ export async function generateAndSharePDF(html: string, fileName: string): Promi
               } catch (saveError) {
                 logger.error('Error al guardar PDF en dispositivo Android', saveError);
                 Alert.alert(
-                  'Error',
-                  'No se pudo guardar el archivo. Por favor, intenta de nuevo.'
+                  'Error de Guardado',
+                  'No se pudo guardar el archivo en el dispositivo. Por favor, intente de nuevo.'
                 );
               }
             },
@@ -117,13 +117,13 @@ export async function generateAndSharePDF(html: string, fileName: string): Promi
                 }
                 await Sharing.shareAsync(shareUri, {
                   mimeType: 'application/pdf',
-                  dialogTitle: 'Compartir reporte de asistencia',
+                  dialogTitle: 'Compartir Reporte de Asistencia',
                 });
               } catch (shareError) {
                 logger.error('Error al compartir PDF en Android', shareError);
                 Alert.alert(
-                  'Error',
-                  'Ocurrió un error al intentar compartir el reporte.'
+                  'Error al Compartir',
+                  'No se pudo abrir el menú de compartición. Por favor, intente de nuevo.'
                 );
               }
             },
@@ -143,8 +143,8 @@ export async function generateAndSharePDF(html: string, fileName: string): Promi
   } catch (error) {
     logger.error('Error generando o procesando PDF', error);
     Alert.alert(
-      'Error',
-      'No se pudo generar el reporte PDF. Por favor, intenta de nuevo.',
+      'Error de Exportación',
+      'Ocurrió un problema al generar el documento PDF. Por favor, intente de nuevo.',
     );
     throw error;
   }
