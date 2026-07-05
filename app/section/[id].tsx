@@ -135,7 +135,12 @@ export default function SectionDetailScreen() {
           index === Math.max(...viewableIndicesRef.current);
 
         if (isLastVisible && index + 1 < students.length) {
-          flatListRef.current?.scrollToIndex({ index: index + 1, viewPosition: 1, animated: true });
+          flatListRef.current?.scrollToIndex({
+            index: index + 1,
+            viewPosition: 0.7,
+            viewOffset: 48,
+            animated: true,
+          });
         }
 
         // Detectar finalización: todos los estudiantes ya tienen asistencia
