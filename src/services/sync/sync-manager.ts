@@ -46,93 +46,271 @@ export async function syncNow(): Promise<SyncResult> {
   // 2. Obtener eventos pendientes (excluye aquellos con attempts >= 5)
   const pendingEvents = await getPendingEvents();
 
-  // 3. Procesar en chunks de 20 eventos
-  const chunkSize = 20;
-  for (let i = 0; i < pendingEvents.length; i += chunkSize) {
-    const chunk = pendingEvents.slice(i, i + chunkSize);
+  if (pendingEvents.length > 0) {
+    // Definición del orden de dependencias para evitar violaciones de claves foráneas
+    const upsertOrder: ('section' | 'student' | 'attendance' | 'behavior')[] = [
+      'section',
+      'student',
+      'attendance',
+      'behavior',
+    ];
+    const deleteOrder: ('section' | 'student' | 'attendance' | 'behavior')[] = [
+      'behavior',
+      'attendance',
+      'student',
+      'section',
+    ];
 
-    // Procesamiento estrictamente SECUENCIAL (for...of + await) dentro del chunk
-    // para evitar saturar conexiones móviles limitadas en el liceo.
-    for (const event of chunk) {
+    // Agrupar eventos por tipo de entidad y operación
+    const upsertsByEntity: Record<string, typeof pendingEvents> = {
+      section: [],
+      student: [],
+      attendance: [],
+      behavior: [],
+    };
+    const deletesByEntity: Record<string, typeof pendingEvents> = {
+      section: [],
+      student: [],
+      attendance: [],
+      behavior: [],
+    };
+
+    for (const event of pendingEvents) {
+      if (event.op === 'upsert') {
+        upsertsByEntity[event.entity]?.push(event);
+      } else if (event.op === 'delete') {
+        deletesByEntity[event.entity]?.push(event);
+      }
+    }
+
+    // 3.1 PROCESAR UPSERTS EN LOTE (Siguiendo el orden de dependencias)
+    for (const entityType of upsertOrder) {
+      const events = upsertsByEntity[entityType];
+      if (events.length === 0) continue;
+
+      // Deduplicar: Si hay múltiples upserts del mismo ID, solo subir el último estado.
+      // Pero debemos recordar TODOS los IDs de eventos asociados para borrarlos al finalizar con éxito.
+      const latestEventsMap = new Map<string, typeof pendingEvents[0]>();
+      const allEventIdsByEntityId = new Map<string, string[]>();
+
+      for (const event of events) {
+        latestEventsMap.set(event.entityId, event);
+        if (!allEventIdsByEntityId.has(event.entityId)) {
+          allEventIdsByEntityId.set(event.entityId, []);
+        }
+        allEventIdsByEntityId.get(event.entityId)!.push(event.id);
+      }
+
+      const uniqueEvents = Array.from(latestEventsMap.values());
+      const payloads = uniqueEvents.map((event) => preparePayloadForRemote(event.payload));
+
+      let error: any = null;
+
       try {
-        const remoteData = preparePayloadForRemote(event.payload);
-        let error: any = null;
-        let isUnknown = false;
-
-        switch (event.entity) {
+        switch (entityType) {
           case 'section':
-            if (event.op === 'upsert') {
-              const res = await supabase.from('sections').upsert(remoteData, { onConflict: 'id' });
-              error = res.error;
-            } else if (event.op === 'delete') {
-              const res = await supabase.from('sections').delete().eq('id', event.entityId);
-              error = res.error;
-            }
+            const resSec = await supabase.from('sections').upsert(payloads, { onConflict: 'id' });
+            error = resSec.error;
             break;
           case 'student':
-            if (event.op === 'upsert') {
-              const res = await supabase.from('students').upsert(remoteData, { onConflict: 'id' });
-              error = res.error;
-            } else if (event.op === 'delete') {
-              const res = await supabase.from('students').delete().eq('id', event.entityId);
-              error = res.error;
-            }
+            const resStud = await supabase.from('students').upsert(payloads, { onConflict: 'id' });
+            error = resStud.error;
             break;
           case 'attendance':
-            if (event.op === 'upsert') {
-              const res = await supabase.from('attendance_records').upsert(remoteData, { onConflict: 'id' });
-              error = res.error;
-            } else if (event.op === 'delete') {
-              const res = await supabase.from('attendance_records').delete().eq('id', event.entityId);
-              error = res.error;
-            }
+            const resAtt = await supabase.from('attendance_records').upsert(payloads, { onConflict: 'id' });
+            error = resAtt.error;
             break;
           case 'behavior':
-            if (event.op === 'upsert') {
-              const res = await supabase.from('behavior_reports').upsert(remoteData, { onConflict: 'id' });
-              error = res.error;
-            } else if (event.op === 'delete') {
-              const res = await supabase.from('behavior_reports').delete().eq('id', event.entityId);
-              error = res.error;
+            const resBeh = await supabase.from('behavior_reports').upsert(payloads, { onConflict: 'id' });
+            error = resBeh.error;
+            break;
+        }
+
+        if (error) throw error;
+
+        // Éxito del lote: limpiar todos los eventos (incluyendo duplicados intermedios) de la cola
+        const eventIdsToRemove: string[] = [];
+        for (const event of uniqueEvents) {
+          const ids = allEventIdsByEntityId.get(event.entityId) || [event.id];
+          eventIdsToRemove.push(...ids);
+          await markEntitySynced(event.entity, event.entityId);
+          pushed += ids.length;
+        }
+
+        for (const eventId of eventIdsToRemove) {
+          await removeEvent(eventId);
+        }
+      } catch (batchError) {
+        logger.warn(
+          `Fallo el batch upsert para la entidad "${entityType}". Aplicando fallback secuencial.`,
+          batchError
+        );
+
+        // FALLBACK SECUENCIAL: Procesar uno por uno los registros únicos de este lote para aislar el error
+        for (const event of uniqueEvents) {
+          try {
+            const remoteData = preparePayloadForRemote(event.payload);
+            let singleError: any = null;
+
+            switch (entityType) {
+              case 'section':
+                const resSec = await supabase.from('sections').upsert(remoteData, { onConflict: 'id' });
+                singleError = resSec.error;
+                break;
+              case 'student':
+                const resStud = await supabase.from('students').upsert(remoteData, { onConflict: 'id' });
+                singleError = resStud.error;
+                break;
+              case 'attendance':
+                const resAtt = await supabase.from('attendance_records').upsert(remoteData, { onConflict: 'id' });
+                singleError = resAtt.error;
+                break;
+              case 'behavior':
+                const resBeh = await supabase.from('behavior_reports').upsert(remoteData, { onConflict: 'id' });
+                singleError = resBeh.error;
+                break;
             }
+
+            if (singleError) throw singleError;
+
+            // Éxito individual: eliminar eventos del outbox
+            const ids = allEventIdsByEntityId.get(event.entityId) || [event.id];
+            for (const eventId of ids) {
+              await removeEvent(eventId);
+            }
+            await markEntitySynced(event.entity, event.entityId);
+            pushed += ids.length;
+          } catch (singleErr: any) {
+            logger.error(`Error en fallback secuencial al subir ${event.entity} con ID ${event.entityId}:`, singleErr);
+            const httpStatus = extractHttpStatus(singleErr);
+
+            if (httpStatus === 401) {
+              useAuthStore.getState().signOut();
+              throw new Error('Sesión expirada. Por favor, inicia sesión de nuevo.');
+            }
+
+            if (httpStatus === 403) {
+              // Error 403 RLS (Seguridad en Supabase): se incrementan intentos y se continúa
+              const ids = allEventIdsByEntityId.get(event.entityId) || [event.id];
+              for (const eventId of ids) {
+                await incrementAttempts(eventId, singleErr.message || 'Error de RLS en Supabase');
+              }
+              errors.push(`${event.entity} (${event.entityId}): ${singleErr.message || '403 Forbidden (RLS)'}`);
+              failed += ids.length;
+            } else {
+              // Error de conexión o servidor general: aborta la sincronización completa
+              throw singleErr;
+            }
+          }
+        }
+      }
+    }
+
+    // 3.2 PROCESAR DELETES EN LOTE (Siguiendo orden de dependencia inverso)
+    for (const entityType of deleteOrder) {
+      const events = deletesByEntity[entityType];
+      if (events.length === 0) continue;
+
+      // Agrupar IDs de eventos por ID de la entidad a eliminar
+      const allEventIdsByEntityId = new Map<string, string[]>();
+      for (const event of events) {
+        if (!allEventIdsByEntityId.has(event.entityId)) {
+          allEventIdsByEntityId.set(event.entityId, []);
+        }
+        allEventIdsByEntityId.get(event.entityId)!.push(event.id);
+      }
+
+      const uniqueEntityIds = Array.from(allEventIdsByEntityId.keys());
+      let error: any = null;
+
+      try {
+        switch (entityType) {
+          case 'section':
+            const resSec = await supabase.from('sections').delete().in('id', uniqueEntityIds);
+            error = resSec.error;
             break;
-          default:
-            isUnknown = true;
+          case 'student':
+            const resStud = await supabase.from('students').delete().in('id', uniqueEntityIds);
+            error = resStud.error;
+            break;
+          case 'attendance':
+            const resAtt = await supabase.from('attendance_records').delete().in('id', uniqueEntityIds);
+            error = resAtt.error;
+            break;
+          case 'behavior':
+            const resBeh = await supabase.from('behavior_reports').delete().in('id', uniqueEntityIds);
+            error = resBeh.error;
             break;
         }
 
-        if (isUnknown) {
-          logger.warn(`Entidad desconocida omitida en outbox: ${event.entity}`);
-          continue;
+        if (error) throw error;
+
+        // Éxito del lote de eliminación: remover todos los eventos de la cola
+        for (const entityId of uniqueEntityIds) {
+          const ids = allEventIdsByEntityId.get(entityId) || [];
+          for (const eventId of ids) {
+            await removeEvent(eventId);
+          }
+          pushed += ids.length;
         }
+      } catch (batchError) {
+        logger.warn(
+          `Fallo el batch delete para la entidad "${entityType}". Aplicando fallback secuencial.`,
+          batchError
+        );
 
-        if (error) {
-          throw error;
-        }
+        // FALLBACK SECUENCIAL: eliminar uno a uno para aislar fallos
+        for (const entityId of uniqueEntityIds) {
+          try {
+            let singleError: any = null;
 
-        // Éxito: remover de la cola outbox y marcar estado synced localmente
-        await removeEvent(event.id);
-        await markEntitySynced(event.entity, event.entityId);
-        pushed++;
-      } catch (error: any) {
-        logger.error(`Error sincronizando evento ${event.id} en Supabase`, error);
+            switch (entityType) {
+              case 'section':
+                const resSec = await supabase.from('sections').delete().eq('id', entityId);
+                singleError = resSec.error;
+                break;
+              case 'student':
+                const resStud = await supabase.from('students').delete().eq('id', entityId);
+                singleError = resStud.error;
+                break;
+              case 'attendance':
+                const resAtt = await supabase.from('attendance_records').delete().eq('id', entityId);
+                singleError = resAtt.error;
+                break;
+              case 'behavior':
+                const resBeh = await supabase.from('behavior_reports').delete().eq('id', entityId);
+                singleError = resBeh.error;
+                break;
+            }
 
-        const httpStatus = extractHttpStatus(error);
+            if (singleError) throw singleError;
 
-        if (httpStatus === 401) {
-          useAuthStore.getState().signOut();
-          throw new Error('Sesión expirada. Por favor, inicia sesión de nuevo.');
-        }
+            // Éxito individual: eliminar de outbox
+            const ids = allEventIdsByEntityId.get(entityId) || [];
+            for (const eventId of ids) {
+              await removeEvent(eventId);
+            }
+            pushed += ids.length;
+          } catch (singleErr: any) {
+            logger.error(`Error en fallback secuencial al eliminar ${entityType} con ID ${entityId}:`, singleErr);
+            const httpStatus = extractHttpStatus(singleErr);
 
-        if (httpStatus === 403) {
-          // Si es error 403 (RLS denegado en Supabase), tratarlo como fallo individual
-          // sin interrumpir la cola (se incrementan los intentos y se avanza al siguiente)
-          await incrementAttempts(event.id, error.message || 'Error de RLS en Supabase');
-          errors.push(`${event.entity} (${event.entityId}): ${error.message || '403 Forbidden (RLS)'}`);
-          failed++;
-        } else {
-          // Si es un error de red o del servidor, abortamos todo el proceso de sync
-          throw error;
+            if (httpStatus === 401) {
+              useAuthStore.getState().signOut();
+              throw new Error('Sesión expirada durante la eliminación de datos.');
+            }
+
+            if (httpStatus === 403) {
+              const ids = allEventIdsByEntityId.get(entityId) || [];
+              for (const eventId of ids) {
+                await incrementAttempts(eventId, singleErr.message || 'Error de RLS en Supabase');
+              }
+              errors.push(`delete ${entityType} (${entityId}): ${singleErr.message || '403 Forbidden (RLS)'}`);
+              failed += ids.length;
+            } else {
+              throw singleErr;
+            }
+          }
         }
       }
     }
