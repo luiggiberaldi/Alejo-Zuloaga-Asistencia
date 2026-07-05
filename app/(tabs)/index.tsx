@@ -1,5 +1,5 @@
 import { useCallback, useState } from 'react';
-import { FlatList, RefreshControl, StyleSheet, View } from 'react-native';
+import { FlatList, RefreshControl, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 
 import { router, useFocusEffect } from 'expo-router';
 import { FAB, Snackbar, Text } from 'react-native-paper';
@@ -13,6 +13,8 @@ import { colors } from '@/theme';
 
 import type { Section, YearLevel } from '@/modules/sections/types';
 
+const YEAR_OPTIONS: ('todos' | YearLevel)[] = ['todos', '1ro', '2do', '3ro', '4to', '5to'];
+
 export default function InicioScreen() {
   const sections = useSectionsStore((state) => state.sections);
   const loading = useSectionsStore((state) => state.loading);
@@ -24,6 +26,7 @@ export default function InicioScreen() {
   const role = useAuthStore((state) => state.role);
 
   const [modalVisible, setModalVisible] = useState(false);
+  const [selectedYear, setSelectedYear] = useState<'todos' | YearLevel>('todos');
 
   useFocusEffect(
     useCallback(() => {
@@ -42,17 +45,51 @@ export default function InicioScreen() {
     return <SectionCard section={item} onPress={() => router.push(`/section/${item.id}`)} />;
   }
 
+  const filteredSections = sections.filter((s) => {
+    if (selectedYear === 'todos') return true;
+    return s.yearLevel === selectedYear;
+  });
+
   return (
     <View style={styles.container}>
       <Text variant="headlineSmall" style={styles.header}>
         Mis Secciones
       </Text>
 
+      <View style={styles.filterWrapper}>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.filterScroll}
+        >
+          {YEAR_OPTIONS.map((year) => (
+            <TouchableOpacity
+              key={year}
+              onPress={() => setSelectedYear(year)}
+              style={[
+                styles.chip,
+                selectedYear === year ? styles.chipSelected : styles.chipUnselected,
+              ]}
+              activeOpacity={0.7}
+            >
+              <Text
+                style={[
+                  styles.chipText,
+                  selectedYear === year ? styles.chipTextSelected : styles.chipTextUnselected,
+                ]}
+              >
+                {year === 'todos' ? 'Todos' : `${year} Año`}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+      </View>
+
       <FlatList
-        data={sections}
+        data={filteredSections}
         keyExtractor={(item) => item.id}
         renderItem={renderItem}
-        contentContainerStyle={sections.length === 0 ? styles.emptyContent : styles.listContent}
+        contentContainerStyle={filteredSections.length === 0 ? styles.emptyContent : styles.listContent}
         refreshControl={
           <RefreshControl refreshing={loading} onRefresh={loadSections} colors={[colors.primary]} />
         }
@@ -60,7 +97,13 @@ export default function InicioScreen() {
           <EmptyState
             icon="school-outline"
             title="No hay secciones"
-            subtitle={role === 'profesor' ? 'Crea la primera con el botón +' : 'No hay secciones disponibles.'}
+            subtitle={
+              selectedYear !== 'todos'
+                ? `No hay secciones registradas para ${selectedYear} año.`
+                : role === 'profesor'
+                ? 'Crea la primera con el botón +'
+                : 'No hay secciones disponibles.'
+            }
           />
         }
       />
@@ -88,8 +131,45 @@ const styles = StyleSheet.create({
     backgroundColor: colors.background,
   },
   header: {
-    padding: 16,
+    paddingHorizontal: 16,
+    paddingTop: 16,
+    paddingBottom: 8,
     color: colors.text,
+    fontWeight: 'bold',
+  },
+  filterWrapper: {
+    height: 48,
+    marginBottom: 8,
+  },
+  filterScroll: {
+    paddingHorizontal: 16,
+    gap: 8,
+  },
+  chip: {
+    paddingHorizontal: 16,
+    height: 36,
+    borderRadius: 18,
+    borderWidth: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  chipSelected: {
+    backgroundColor: colors.primary,
+    borderColor: colors.primary,
+  },
+  chipUnselected: {
+    backgroundColor: '#FFFFFF',
+    borderColor: '#E0E0E0',
+  },
+  chipText: {
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  chipTextSelected: {
+    color: '#FFFFFF',
+  },
+  chipTextUnselected: {
+    color: '#616161',
   },
   listContent: {
     paddingBottom: 96,
