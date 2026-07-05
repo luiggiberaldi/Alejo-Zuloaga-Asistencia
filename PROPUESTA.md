@@ -1,7 +1,43 @@
+<style>
+@media print {
+  body {
+    font-family: Arial, sans-serif;
+    font-size: 11pt;
+    line-height: 1.5;
+    color: #333;
+  }
+  h1, h2, h3, h4 {
+    page-break-after: avoid;
+    break-after: avoid;
+  }
+  tr, li {
+    page-break-inside: avoid;
+    break-inside: avoid;
+  }
+  @page {
+    size: Letter;
+    margin: 1.8cm 1.5cm;
+  }
+  h2 {
+    margin-top: 1.2em;
+    margin-bottom: 0.6em;
+    border-bottom: 1px solid #ddd;
+    padding-bottom: 0.3em;
+  }
+  hr {
+    page-break-before: auto;
+    break-before: auto;
+    margin: 1.5em 0;
+    border: 0;
+    border-top: 1px solid #ccc;
+  }
+}
+</style>
+
 # Propuesta de Piloto: Alejo Zuloaga Asistencia
 
 **Preparado para:** Autoridades del Complejo Educativo Alejo Zuloaga
-**Preparado por:** Luigi Berardi — Synaptica
+**Preparado por:** Luigi Beraldi — Synaptica
 **Fecha:** 4 de julio de 2026
 **Institución:** Complejo Educativo Alejo Zuloaga — Valencia, Carabobo
 
@@ -123,7 +159,7 @@ La inversión única por el desarrollo del Producto Mínimo Viable (MVP), su des
 
 ## Contacto
 
-**Luigi Berardi**
+**Luigi Beraldi**
 Jefe de Desarrolladores de Software — Synaptica
 📧 synapcitaia@gmail.com
 📱 0412-405-1793
